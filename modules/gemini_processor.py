@@ -30,47 +30,33 @@ Antes de escrever qualquer palavra, analise cada commit e aplique as regras abai
 REGRAS DE SANITIZAÇÃO (violação = falha crítica):
 • NUNCA mencione nomes de empresas, clientes, produtos ou projetos internos.
 • NUNCA inclua trechos de código, nomes de variáveis, funções, arquivos ou endpoints.
-• NUNCA revele regras de negócio, fluxos proprietários ou lógicas de domínio.
+• NUNCA revele regras de negócio, fluxos proprietários, cenários específicos do cliente ou lógicas de domínio.
 • NUNCA cite nomes de ferramentas internas, namespaces, URLs de staging/prod.
-• NUNCA exponha métricas que revelem escala da empresa (usuários, receita, volume).
-• NUNCA mencione nomes de colegas, times ou estruturas organizacionais.
-• Substitua SEMPRE nomes próprios por abstrações técnicas genéricas.
+• Substitua SEMPRE nomes próprios e cenários de uso por abstrações técnicas genéricas.
 
 GUIA DE ABSTRAÇÃO (exemplos):
-  "Fix payment bug for ClientXYZ"         → "Diagnóstico de race condition em serviço de processamento financeiro"
-  "Add admin role to CompanyDashboard"    → "Implementação de controle de acesso baseado em perfis (RBAC)"
+  "Fix payment bug for ClientXYZ"         → "Diagnóstico de race condition em processamento assíncrono"
   "Refactor Oracle queries for BancoABC"  → "Otimização de queries legadas para redução de latência"
-  "Migrate users from OldPlatform"        → "Estratégia de migração de dados entre sistemas heterogêneos"
-  "Fix SSO token expiry in CorpPortal"    → "Tratamento de ciclo de vida de tokens em autenticação federada"
-  "Integrate with ThirdPartyAPI v2"       → "Integração e versionamento de APIs de terceiros com retrocompatibilidade"
+  "Facial recognition in tennis courts"   → "Análise de performance de visão computacional em ambientes abertos dinâmicos"
 
 MISSÃO 2 — REDAÇÃO DO POST LINKEDIN
 Após sanitizar os dados, escreva UM post coeso e engajador seguindo estas diretrizes:
 
 ESTRUTURA OBRIGATÓRIA:
-1. GANCHO (1-2 linhas): pergunta provocativa, afirmação ousada ou cenário técnico relatable.
-2. CORPO (2-3 parágrafos): o desafio técnico → a abordagem/solução → o aprendizado.
-3. FECHAMENTO (1 parágrafo): reflexão sobre o padrão arquitetural ou lição transferível.
-4. REFERÊNCIAS DE ESTUDO: Baseado nas tecnologias ou padrões inferidos a partir dos commits (ex: AWS, Visão Computacional, GraphQL, Microsserviços), adicione uma breve seção recomendando 1 ou 2 links REAIS e úteis de documentação oficial (ex: docs.aws.amazon.com) ou artigos conceituados (ex: Martin Fowler, blogs de engenharia) para quem deseja se aprofundar.
-5. HASHTAGS: 4-6 hashtags em inglês no final (padrão LinkedIn internacional).
+1. GANCHO (1-2 linhas): Uma pergunta provocativa, afirmação ousada ou cenário técnico com o qual outros devs se identifiquem.
+2. O DESAFIO TÉCNICO (Storytelling): O que estava em jogo? Qual era a dificuldade (abstraída)? 
+3. A ABORDAGEM E APRENDIZADO: Como o problema foi resolvido e qual lição de arquitetura ou engenharia ficou.
+4. REFERÊNCIAS DE ESTUDO (Anti-Alucinação): Adicione uma breve seção recomendando 1 ou 2 fontes de estudo. IMPORTANTE: Não invente URLs profundas. Forneça apenas o domínio raiz oficial (ex: docs.aws.amazon.com) ou recomende os termos exatos de busca (ex: "Pesquise por 'Machine Learning Evaluation Metrics' no blog do Martin Fowler").
+5. HASHTAGS: 4-5 hashtags em inglês.
 
-REGRAS DE ESTILO:
+REGRAS DE ESTILO (Otimizado para Leitura Mobile):
 • Idioma: {language}
-• Tamanho: entre 1.200 e 1.800 caracteres (ideal para engajamento no LinkedIn).
-• Tom: profissional mas conversacional — como um sênior explicando para um colega.
-• Emojis: use no máximo 3, apenas onde amplificam o significado (não decoração).
-• Evite bullet points excessivos — prefira prosa fluida.
-• Nunca use jargão genérico vazio como "soluções inovadoras" ou "melhores práticas".
-• Foque em: trade-offs técnicos reais, decisões de arquitetura, performance, observabilidade.
+• Escaneabilidade: MÁXIMO de 3 a 4 linhas por parágrafo. Use quebras de linha para dar respiro à leitura.
+• Tom: Profissional, mas conversacional — como um sênior trocando ideia no Slack.
+• Emojis: Use no máximo 2, apenas para dar ênfase visual.
+• Proibido: Jargões de marketing vazios ("soluções inovadoras", "quebrando paradigmas"). Foque no trade-off técnico.
 
-TEMAS PRIORITÁRIOS (em ordem de impacto):
-  1. Refatoração e débito técnico — o "porquê" das decisões
-  2. Performance e escalabilidade — métricas relativas (ex: "40% de redução de latência")
-  3. Segurança e resiliência — autenticação, tratamento de falhas
-  4. Developer Experience — CI/CD, testing, tooling
-  5. Integrações — APIs, eventos, mensageria
-
-OUTPUT: Apenas o texto do post, sem prefácio, sem explicações, sem markdown extra.
+OUTPUT: Apenas o texto do post, sem prefácio, sem explicações extras.
 """.strip()
 
 def generate_post(raw_log: str) -> str:
