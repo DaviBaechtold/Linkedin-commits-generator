@@ -48,19 +48,20 @@ MISSÃO 2 — REDAÇÃO DO POST LINKEDIN
 Após sanitizar os dados, escreva UM post coeso e engajador seguindo estas diretrizes:
 
 ESTRUTURA OBRIGATÓRIA:
-1. GANCHO (1-2 linhas): pergunta provocativa, afirmação ousada ou cenário técnico relatable
-2. CORPO (2-3 parágrafos): o desafio técnico → a abordagem/solução → o aprendizado
-3. FECHAMENTO (1 parágrafo): reflexão sobre o padrão arquitetural ou lição transferível
-4. HASHTAGS: 4-6 hashtags em inglês no final (padrão LinkedIn internacional)
+1. GANCHO (1-2 linhas): pergunta provocativa, afirmação ousada ou cenário técnico relatable.
+2. CORPO (2-3 parágrafos): o desafio técnico → a abordagem/solução → o aprendizado.
+3. FECHAMENTO (1 parágrafo): reflexão sobre o padrão arquitetural ou lição transferível.
+4. REFERÊNCIAS DE ESTUDO: Baseado nas tecnologias ou padrões inferidos a partir dos commits (ex: AWS, Visão Computacional, GraphQL, Microsserviços), adicione uma breve seção recomendando 1 ou 2 links REAIS e úteis de documentação oficial (ex: docs.aws.amazon.com) ou artigos conceituados (ex: Martin Fowler, blogs de engenharia) para quem deseja se aprofundar.
+5. HASHTAGS: 4-6 hashtags em inglês no final (padrão LinkedIn internacional).
 
 REGRAS DE ESTILO:
 • Idioma: {language}
-• Tamanho: entre 1.200 e 1.800 caracteres (ideal para engajamento no LinkedIn)
-• Tom: profissional mas conversacional — como um sênior explicando para um colega
-• Emojis: use no máximo 3, apenas onde amplificam o significado (não decoração)
-• Evite bullet points excessivos — prefira prosa fluida
-• Nunca use jargão genérico vazio como "soluções inovadoras" ou "melhores práticas"
-• Foque em: trade-offs técnicos reais, decisões de arquitetura, performance, observabilidade
+• Tamanho: entre 1.200 e 1.800 caracteres (ideal para engajamento no LinkedIn).
+• Tom: profissional mas conversacional — como um sênior explicando para um colega.
+• Emojis: use no máximo 3, apenas onde amplificam o significado (não decoração).
+• Evite bullet points excessivos — prefira prosa fluida.
+• Nunca use jargão genérico vazio como "soluções inovadoras" ou "melhores práticas".
+• Foque em: trade-offs técnicos reais, decisões de arquitetura, performance, observabilidade.
 
 TEMAS PRIORITÁRIOS (em ordem de impacto):
   1. Refatoração e débito técnico — o "porquê" das decisões
@@ -68,8 +69,9 @@ TEMAS PRIORITÁRIOS (em ordem de impacto):
   3. Segurança e resiliência — autenticação, tratamento de falhas
   4. Developer Experience — CI/CD, testing, tooling
   5. Integrações — APIs, eventos, mensageria
-""".strip()
 
+OUTPUT: Apenas o texto do post, sem prefácio, sem explicações, sem markdown extra.
+""".strip()
 
 def generate_post(raw_log: str) -> str:
     language_map = {"pt-br": "Português do Brasil", "en": "English"}
