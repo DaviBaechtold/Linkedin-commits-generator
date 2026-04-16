@@ -36,11 +36,11 @@ def send_draft_for_review(draft_id: str, post_text: str) -> int:
     preview = post_text[:3500] + ("\n\n[...truncado para preview]" if len(post_text) > 3500 else "")
 
     text = (
-        f"📝 *Novo draft pronto para revisão*\n"
-        f"`ID: {draft_id}`\n\n"
-        f"{'─' * 30}\n\n"
+        f"📝 Novo draft pronto para revisão\n"
+        f"ID: {draft_id}\n\n"
+        f"{'=' * 30}\n\n"
         f"{preview}\n\n"
-        f"{'─' * 30}\n\n"
+        f"{'=' * 30}\n\n"
         f"Revise o texto acima e escolha uma ação:"
     )
 
@@ -54,7 +54,6 @@ def send_draft_for_review(draft_id: str, post_text: str) -> int:
     result = _post("sendMessage", {
         "chat_id": config.TELEGRAM_CHAT_ID,
         "text": text,
-        "parse_mode": "Markdown",
         "reply_markup": keyboard,
     })
     return result["message_id"]
@@ -71,8 +70,7 @@ def edit_message_after_action(message_id: int, action: str, draft_id: str) -> No
     _post("editMessageText", {
         "chat_id": config.TELEGRAM_CHAT_ID,
         "message_id": message_id,
-        "text": f"{action_text}\n\n`ID: {draft_id}`",
-        "parse_mode": "Markdown",
+        "text": f"{action_text}\n\nID: {draft_id}",
     })
 
 
@@ -80,8 +78,7 @@ def send_error_alert(message: str) -> None:
     """Envia alerta de erro simples (sem botões)."""
     _post("sendMessage", {
         "chat_id": config.TELEGRAM_CHAT_ID,
-        "text": f"⚠️ *Erro na automação LinkedIn*\n\n`{message[:1000]}`",
-        "parse_mode": "Markdown",
+        "text": f"⚠️ Erro na automação LinkedIn\n\n{message[:1000]}",
     })
 
 

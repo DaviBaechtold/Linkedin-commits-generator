@@ -40,6 +40,7 @@ def _run_git_log(repo_path: Path, author: str, since: str) -> list[str]:
         "log",
         f"--author={author}",
         f"--since={since}",
+        "-n", "30",             # máximo 30 commits por repositório
         "--no-merges",
         "--format=%h|%ad|%s",   # hash|data|assunto
         "--date=short",

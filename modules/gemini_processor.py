@@ -1,24 +1,22 @@
 """
 Processa o log de commits via Gemini API.
-
-Contém o "Super System Prompt" que age como:
-  1. Filtro de NDA — remove qualquer dado sensível
-  2. Redator Tech Sênior — transforma commits em narrativa LinkedIn
+Atualizado para usar o novo SDK 'google-genai'.
 """
 from __future__ import annotations
-
-import google.generativeai as genai
+import time
+from google import genai
+from google.genai import types
 
 import config
 
-# ─── Configuração ──────────────────────────────────────────────────────────────
-genai.configure(api_key=config.GEMINI_API_KEY)
+# ─── Configuração do Cliente ───────────────────────────────────────────────────
+client = genai.Client(api_key=config.GEMINI_API_KEY)
 
 _SAFETY_SETTINGS = [
-    {"category": "HARM_CATEGORY_HARASSMENT",       "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_HATE_SPEECH",       "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+    types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
+    types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
+    types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
+    types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
 ]
 
 # ─── Super System Prompt ───────────────────────────────────────────────────────
@@ -70,24 +68,10 @@ TEMAS PRIORITÁRIOS (em ordem de impacto):
   3. Segurança e resiliência — autenticação, tratamento de falhas
   4. Developer Experience — CI/CD, testing, tooling
   5. Integrações — APIs, eventos, mensageria
-
-OUTPUT: Apenas o texto do post, sem prefácio, sem explicações, sem markdown extra.
 """.strip()
 
 
 def generate_post(raw_log: str) -> str:
-    """
-    Envia o log de commits para o Gemini e retorna o post gerado.
-
-    Args:
-        raw_log: Saída já anonimizada de git_extractor.format_for_prompt()
-
-    Returns:
-        Texto do post LinkedIn pronto para revisão humana.
-
-    Raises:
-        RuntimeError: se a API retornar resposta vazia ou bloquear o conteúdo.
-    """
     language_map = {"pt-br": "Português do Brasil", "en": "English"}
     language = language_map.get(config.POST_LANGUAGE, "Português do Brasil")
 
@@ -99,19 +83,28 @@ def generate_post(raw_log: str) -> str:
         f"--- INÍCIO DO LOG ---\n{raw_log}\n--- FIM DO LOG ---"
     )
 
-    model = genai.GenerativeModel(
-        model_name=config.GEMINI_MODEL,
-        system_instruction=system,
-        safety_settings=_SAFETY_SETTINGS,
-    )
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model=config.GEMINI_MODEL,
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system,
+                    safety_settings=_SAFETY_SETTINGS,
+                )
+            )
 
-    response = model.generate_content(user_prompt)
+            if not response.text or not response.text.strip():
+                raise RuntimeError("Gemini retornou resposta vazia.")
 
-    if not response.text or not response.text.strip():
-        finish = getattr(response.candidates[0], "finish_reason", "unknown") if response.candidates else "no candidates"
-        raise RuntimeError(
-            f"Gemini retornou resposta vazia. finish_reason={finish}\n"
-            "Verifique se o log de commits não está vazio ou contém termos bloqueados."
-        )
-
-    return response.text.strip()
+            return response.text.strip()
+        
+        except Exception as e:
+            # Se for erro 503 e ainda não passamos do limite de tentativas, espera e tenta de novo
+            if "503" in str(e) and attempt < (max_retries - 1):
+                wait_time = 15 * (attempt + 1) # Espera 15s, depois 30s...
+                print(f"[Aviso] Servidor do Gemini ocupado. Tentando novamente em {wait_time}s... (Tentativa {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+            else:
+                raise RuntimeError(f"Falha na API do Gemini: {e}")

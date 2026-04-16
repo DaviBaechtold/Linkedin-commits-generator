@@ -32,7 +32,7 @@ def _repo_paths() -> list[Path]:
 
 # ─── Gemini ────────────────────────────────────────────────────────────────────
 GEMINI_API_KEY: str = _require("GEMINI_API_KEY")
-GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL: str = _require("GEMINI_MODEL")
 
 # ─── Telegram ──────────────────────────────────────────────────────────────────
 TELEGRAM_BOT_TOKEN: str = _require("TELEGRAM_BOT_TOKEN")
