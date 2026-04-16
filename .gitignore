@@ -1,0 +1,7 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+data/drafts.json
+logs/
+.DS_Store

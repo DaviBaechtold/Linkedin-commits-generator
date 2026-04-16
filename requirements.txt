@@ -1,0 +1,6 @@
+python-telegram-bot==21.6
+google-generativeai==0.8.3
+python-dotenv==1.0.1
+requests==2.32.3
+GitPython==3.1.43
+aiohttp==3.10.10
