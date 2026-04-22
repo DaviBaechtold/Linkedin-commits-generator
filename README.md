@@ -100,8 +100,8 @@ GEMINI_MODEL=gemini-1.5-flash
 
 # Imagem/fluxograma
 ENABLE_VISUAL_ASSETS=true
-GEMINI_IMAGE_MODEL=gemini-2.0-flash-preview-image-generation
-GEMINI_IMAGE_FALLBACK_MODELS=gemini-2.0-flash-preview-image-generation
+GEMINI_IMAGE_MODEL=gemini-3.1-flash-image-preview
+GEMINI_IMAGE_FALLBACK_MODELS=gemini-2.5-flash-image,gemini-2.0-flash-preview-image-generation
 GEMINI_RETRY_429_MAX_WAIT_SECONDS=75
 VISUAL_ASSET_STYLE=flowchart
 VISUAL_ASSET_COUNT=1

@@ -53,11 +53,11 @@ def _as_csv_list(key: str, default: str = "") -> list[str]:
 GEMINI_API_KEY: str = _require("GEMINI_API_KEY")
 GEMINI_MODEL: str = _require("GEMINI_MODEL")
 GEMINI_IMAGE_MODEL: str = os.getenv(
-    "GEMINI_IMAGE_MODEL", "gemini-2.0-flash-preview-image-generation"
+    "GEMINI_IMAGE_MODEL", "gemini-3.1-flash-image-preview"
 )
 GEMINI_IMAGE_FALLBACK_MODELS: list[str] = _as_csv_list(
     "GEMINI_IMAGE_FALLBACK_MODELS",
-    "gemini-2.0-flash-preview-image-generation",
+    "gemini-2.5-flash-image,gemini-2.0-flash-preview-image-generation",
 )
 GEMINI_RETRY_429_MAX_WAIT_SECONDS: int = max(
     5,

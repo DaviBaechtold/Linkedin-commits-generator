@@ -4,6 +4,7 @@ Atualizado para usar o novo SDK 'google-genai'.
 """
 from __future__ import annotations
 import base64
+import io
 import re
 import time
 from google import genai
@@ -191,6 +192,43 @@ def _extract_inline_image(response) -> tuple[bytes, str] | None:
     return None
 
 
+def _extract_generated_image(response) -> tuple[bytes, str] | None:
+    generated_images = getattr(response, "generated_images", None) or []
+
+    for generated in generated_images:
+        image_obj = getattr(generated, "image", None)
+        if image_obj is None and isinstance(generated, dict):
+            image_obj = generated.get("image")
+        if image_obj is None:
+            continue
+
+        mime_type = (
+            getattr(image_obj, "mime_type", None)
+            or getattr(image_obj, "mimeType", None)
+            or (image_obj.get("mime_type") if isinstance(image_obj, dict) else None)
+            or "image/jpeg"
+        )
+
+        image_bytes = (
+            getattr(image_obj, "image_bytes", None)
+            or getattr(image_obj, "bytes", None)
+            or (image_obj.get("image_bytes") if isinstance(image_obj, dict) else None)
+            or (image_obj.get("bytes") if isinstance(image_obj, dict) else None)
+            or (image_obj.get("data") if isinstance(image_obj, dict) else None)
+        )
+        if image_bytes:
+            return _decode_inline_data(image_bytes), mime_type
+
+        # Alguns SDKs retornam um objeto de imagem com .save (ex.: PIL-like).
+        if hasattr(image_obj, "save"):
+            buffer = io.BytesIO()
+            fmt = "JPEG" if mime_type in ("image/jpeg", "image/jpg") else "PNG"
+            image_obj.save(buffer, format=fmt)
+            return buffer.getvalue(), mime_type
+
+    return None
+
+
 def _file_extension_for_mime(mime_type: str) -> str:
     mapping = {
         "image/png": ".png",
@@ -246,6 +284,59 @@ def _image_model_candidates() -> list[str]:
             unique_candidates.append(model)
     return unique_candidates
 
+
+def _request_image_from_model(model_name: str, prompt: str) -> tuple[bytes, str]:
+    generate_images_fn = getattr(client.models, "generate_images", None)
+    generate_images_config_cls = getattr(types, "GenerateImagesConfig", None)
+
+    if callable(generate_images_fn) and generate_images_config_cls is not None:
+        try:
+            image_response = _call_with_retry(
+                lambda: generate_images_fn(
+                    model=model_name,
+                    prompt=prompt,
+                    config=generate_images_config_cls(
+                        number_of_images=1,
+                        aspect_ratio="16:9",
+                        output_mime_type="image/jpeg",
+                    ),
+                ),
+                context="geração visual (images API)",
+                model_name=model_name,
+                kind="modelo visual",
+                retry_on_429=True,
+            )
+            payload = _extract_generated_image(image_response)
+            if payload:
+                return payload
+        except RuntimeError:
+            # Fallback abaixo para generate_content.
+            pass
+
+    content_response = _call_with_retry(
+        lambda: client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE", "TEXT"],
+                safety_settings=_SAFETY_SETTINGS,
+            ),
+        ),
+        context="geração visual",
+        model_name=model_name,
+        kind="modelo visual",
+        retry_on_429=True,
+    )
+
+    payload = _extract_inline_image(content_response)
+    if not payload:
+        raise RuntimeError(
+            "Modelo retornou sem imagem. "
+            "Verifique se esse modelo suporta geração de imagem na Gemini API."
+        )
+
+    return payload
+
 def generate_post(raw_log: str) -> str:
     language_map = {"pt-br": "Português do Brasil", "en": "English"}
     language = language_map.get(config.POST_LANGUAGE, "Português do Brasil")
@@ -296,29 +387,7 @@ def generate_visual_assets(post_text: str, raw_log_summary: str, draft_id: str) 
             for idx in range(1, config.VISUAL_ASSET_COUNT + 1):
                 prompt = _build_visual_prompt(post_text, raw_log_summary, variant=idx)
 
-                response = _call_with_retry(
-                    lambda: client.models.generate_content(
-                        model=model_name,
-                        contents=prompt,
-                        config=types.GenerateContentConfig(
-                            response_modalities=["IMAGE", "TEXT"],
-                            safety_settings=_SAFETY_SETTINGS,
-                        ),
-                    ),
-                    context="geração visual",
-                    model_name=model_name,
-                    kind="modelo visual",
-                    retry_on_429=True,
-                )
-
-                image_payload = _extract_inline_image(response)
-                if not image_payload:
-                    raise RuntimeError(
-                        "Modelo retornou sem imagem inline. "
-                        "Verifique se esse modelo suporta geração de imagem na Gemini API."
-                    )
-
-                image_bytes, mime_type = image_payload
+                image_bytes, mime_type = _request_image_from_model(model_name, prompt)
                 extension = _file_extension_for_mime(mime_type)
                 file_name = f"{draft_id}_visual_{idx}{extension}"
                 file_path = config.VISUALS_DIR / file_name
