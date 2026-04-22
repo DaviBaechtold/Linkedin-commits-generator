@@ -1,10 +1,9 @@
 """
 Processa o log de commits via Gemini API.
-Atualizado para usar o novo SDK 'google-genai'.
+Atualizado para usar o novo SDK 'google-genai' com integração multi-modelos (Texto -> Imagem).
 """
 from __future__ import annotations
 import base64
-import io
 import re
 import time
 from google import genai
@@ -37,27 +36,21 @@ REGRAS DE SANITIZAÇÃO (violação = falha crítica):
 • NUNCA cite nomes de ferramentas internas, namespaces, URLs de staging/prod.
 • Substitua SEMPRE nomes próprios e cenários de uso por abstrações técnicas genéricas.
 
-GUIA DE ABSTRAÇÃO (exemplos):
-  "Fix payment bug for ClientXYZ"         → "Diagnóstico de race condition em processamento assíncrono"
-  "Refactor Oracle queries for BancoABC"  → "Otimização de queries legadas para redução de latência"
-  "Facial recognition in tennis courts"   → "Análise de performance de visão computacional em ambientes abertos dinâmicos"
-
 MISSÃO 2 — REDAÇÃO DO POST LINKEDIN
 Após sanitizar os dados, escreva UM post coeso e engajador seguindo estas diretrizes:
 
 ESTRUTURA OBRIGATÓRIA:
-1. GANCHO (1-2 linhas): Uma pergunta provocativa, afirmação ousada ou cenário técnico com o qual outros devs se identifiquem.
+1. GANCHO (1-2 linhas): Uma pergunta provocativa ou cenário técnico com o qual outros devs se identifiquem.
 2. O DESAFIO TÉCNICO (Storytelling): O que estava em jogo? Qual era a dificuldade (abstraída)? 
 3. A ABORDAGEM E APRENDIZADO: Como o problema foi resolvido e qual lição de arquitetura ou engenharia ficou.
-4. REFERÊNCIAS DE ESTUDO (Anti-Alucinação): Adicione uma breve seção recomendando 1 ou 2 fontes de estudo. IMPORTANTE: Não invente URLs profundas. Forneça apenas o domínio raiz oficial (ex: docs.aws.amazon.com) ou recomende os termos exatos de busca (ex: "Pesquise por 'Machine Learning Evaluation Metrics' no blog do Martin Fowler").
+4. REFERÊNCIAS DE ESTUDO (Anti-Alucinação): Adicione uma breve seção recomendando 1 ou 2 fontes de estudo oficiais ou artigos (ex: Martin Fowler).
 5. HASHTAGS: 4-5 hashtags em inglês.
 
 REGRAS DE ESTILO (Otimizado para Leitura Mobile):
 • Idioma: {language}
-• Escaneabilidade: MÁXIMO de 3 a 4 linhas por parágrafo. Use quebras de linha para dar respiro à leitura.
-• Tom: Profissional, mas conversacional — como um sênior trocando ideia no Slack.
+• Escaneabilidade: MÁXIMO de 3 a 4 linhas por parágrafo.
+• Tom: Profissional, mas conversacional.
 • Emojis: Use no máximo 2, apenas para dar ênfase visual.
-• Proibido: Jargões de marketing vazios ("soluções inovadoras", "quebrando paradigmas"). Foque no trade-off técnico.
 
 OUTPUT: Apenas o texto do post, sem prefácio, sem explicações extras.
 """.strip()
@@ -125,24 +118,13 @@ def _call_with_retry(
                     and retry_seconds is not None
                     and retry_seconds <= config.GEMINI_RETRY_429_MAX_WAIT_SECONDS
                 ):
-                    print(
-                        f"[Aviso] Limite temporário de cota em {context} ({model_name}). "
-                        f"Aguardando {retry_seconds}s para retry... "
-                        f"(Tentativa {attempt + 1}/{max_retries})"
-                    )
                     time.sleep(retry_seconds)
                     continue
 
                 if retry_seconds is not None:
-                    raise RuntimeError(
-                        f"Cota temporária excedida para {kind} '{model_name}'. "
-                        f"Tente novamente em cerca de {retry_seconds}s."
-                    )
+                    raise RuntimeError(f"Cota temporária excedida para {kind} '{model_name}'.")
 
-                raise RuntimeError(
-                    f"Cota excedida para {kind} '{model_name}'. "
-                    "Tente novamente mais tarde ou ajuste o modelo visual."
-                )
+                raise RuntimeError(f"Cota excedida para {kind} '{model_name}'.")
 
             raise RuntimeError(
                 f"Falha na API do Gemini ({context}, modelo '{model_name}'): "
@@ -161,119 +143,60 @@ def _decode_inline_data(data: bytes | str) -> bytes:
 
 def _extract_inline_image(response) -> tuple[bytes, str] | None:
     candidates = getattr(response, "candidates", None) or []
-
     for candidate in candidates:
         content = getattr(candidate, "content", None)
         parts = getattr(content, "parts", None) or []
-
         for part in parts:
             inline_data = getattr(part, "inline_data", None)
             if inline_data is None and isinstance(part, dict):
                 inline_data = part.get("inline_data") or part.get("inlineData")
             if not inline_data:
                 continue
-
-            mime_type = (
-                getattr(inline_data, "mime_type", None)
-                or getattr(inline_data, "mimeType", None)
-                or (inline_data.get("mime_type") if isinstance(inline_data, dict) else None)
-                or "image/png"
-            )
+            mime_type = getattr(inline_data, "mime_type", "image/png")
             payload = getattr(inline_data, "data", None)
             if payload is None and isinstance(inline_data, dict):
                 payload = inline_data.get("data")
             if payload is None:
                 continue
-
             image_bytes = _decode_inline_data(payload)
             if image_bytes:
                 return image_bytes, mime_type
-
-    return None
-
-
-def _extract_generated_image(response) -> tuple[bytes, str] | None:
-    generated_images = getattr(response, "generated_images", None) or []
-
-    for generated in generated_images:
-        image_obj = getattr(generated, "image", None)
-        if image_obj is None and isinstance(generated, dict):
-            image_obj = generated.get("image")
-        if image_obj is None:
-            continue
-
-        mime_type = (
-            getattr(image_obj, "mime_type", None)
-            or getattr(image_obj, "mimeType", None)
-            or (image_obj.get("mime_type") if isinstance(image_obj, dict) else None)
-            or "image/jpeg"
-        )
-
-        image_bytes = (
-            getattr(image_obj, "image_bytes", None)
-            or getattr(image_obj, "bytes", None)
-            or (image_obj.get("image_bytes") if isinstance(image_obj, dict) else None)
-            or (image_obj.get("bytes") if isinstance(image_obj, dict) else None)
-            or (image_obj.get("data") if isinstance(image_obj, dict) else None)
-        )
-        if image_bytes:
-            return _decode_inline_data(image_bytes), mime_type
-
-        # Alguns SDKs retornam um objeto de imagem com .save (ex.: PIL-like).
-        if hasattr(image_obj, "save"):
-            buffer = io.BytesIO()
-            fmt = "JPEG" if mime_type in ("image/jpeg", "image/jpg") else "PNG"
-            image_obj.save(buffer, format=fmt)
-            return buffer.getvalue(), mime_type
-
     return None
 
 
 def _file_extension_for_mime(mime_type: str) -> str:
-    mapping = {
-        "image/png": ".png",
-        "image/jpeg": ".jpg",
-        "image/webp": ".webp",
-    }
+    mapping = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
     return mapping.get(mime_type, ".png")
 
 
 def _build_visual_prompt(post_text: str, raw_log_summary: str, variant: int) -> str:
-    language_map = {"pt-br": "Português do Brasil", "en": "English"}
-    language = language_map.get(config.POST_LANGUAGE, "Português do Brasil")
-
-    style_guidance = {
-        "flowchart": (
-            "Crie um fluxograma limpo e profissional, formato horizontal 16:9, "
-            "com 4 etapas: Desafio, Abordagem, Aprendizado e Impacto."
-        ),
-        "illustration": (
-            "Crie uma ilustração editorial técnica, estilo moderno e limpo, "
-            "com foco em engenharia de software e aprendizado técnico."
-        ),
-        "auto": (
-            "Escolha automaticamente entre fluxograma visual ou ilustração técnica, "
-            "priorizando clareza para LinkedIn em mobile."
-        ),
-    }.get(config.VISUAL_ASSET_STYLE, "Crie um visual técnico limpo para LinkedIn.")
-
-    return (
-        "Você é um diretor de arte técnico para conteúdo de LinkedIn. "
-        "Gere uma imagem única de alto impacto visual e leitura rápida.\n\n"
-        "Regras obrigatórias:\n"
-        "- Idioma dos textos visíveis na arte: " + language + "\n"
-        "- Não inclua nomes de empresa, cliente, produto interno, endpoint ou código.\n"
-        "- Não use logos de marcas nem elementos com copyright.\n"
-        "- Evite texto excessivo; no máximo título + 4 blocos curtos.\n"
-        "- Tema técnico coerente com o post abaixo.\n\n"
-        "Direção visual:\n"
-        f"- {style_guidance}\n"
-        f"- Variante visual: {variant}.\n\n"
-        "Contexto resumido de commits:\n"
-        f"{raw_log_summary[:1200]}\n\n"
-        "Post base:\n"
-        f"{post_text[:2800]}\n"
+    """
+    Usa a IA de Texto (Gemini) para ler o post gerado e criar uma descrição
+    visual curta (em inglês) para a IA de Imagem (Imagen).
+    """
+    style = config.VISUAL_ASSET_STYLE
+    instructions = (
+        "You are an expert AI image prompt engineer. Based on the following LinkedIn post about software engineering, "
+        "write a highly descriptive image generation prompt in ENGLISH. "
+        f"Style: {style} (modern, conceptual, high quality). "
+        "CRITICAL: Do not include any text, letters, words, code, or logos in the image. "
+        f"Make this variant #{variant} slightly unique in camera angle or colors. "
+        "Must be under 400 characters. Respond ONLY with the prompt, nothing else.\n\n"
+        f"Post Context:\n{post_text[:1500]}"
     )
+    
+    try:
+        # Chama a API de TEXTO para gerar a descrição
+        response = client.models.generate_content(
+            model=config.GEMINI_MODEL,
+            contents=instructions,
+            config=types.GenerateContentConfig(safety_settings=_SAFETY_SETTINGS)
+        )
+        # Limita a 450 caracteres para garantir que o Imagen 4 não dê erro 400
+        return response.text.strip()[:450]
+    except Exception as e:
+        print(f"[Aviso] Falha ao gerar prompt dinâmico, usando genérico: {e}")
+        return f"Abstract conceptual software engineering {style}, glowing data streams, dark theme, high quality digital art, no text"
 
 
 def _image_model_candidates() -> list[str]:
@@ -285,64 +208,11 @@ def _image_model_candidates() -> list[str]:
     return unique_candidates
 
 
-def _request_image_from_model(model_name: str, prompt: str) -> tuple[bytes, str]:
-    generate_images_fn = getattr(client.models, "generate_images", None)
-    generate_images_config_cls = getattr(types, "GenerateImagesConfig", None)
-
-    if callable(generate_images_fn) and generate_images_config_cls is not None:
-        try:
-            image_response = _call_with_retry(
-                lambda: generate_images_fn(
-                    model=model_name,
-                    prompt=prompt,
-                    config=generate_images_config_cls(
-                        number_of_images=1,
-                        aspect_ratio="16:9",
-                        output_mime_type="image/jpeg",
-                    ),
-                ),
-                context="geração visual (images API)",
-                model_name=model_name,
-                kind="modelo visual",
-                retry_on_429=True,
-            )
-            payload = _extract_generated_image(image_response)
-            if payload:
-                return payload
-        except RuntimeError:
-            # Fallback abaixo para generate_content.
-            pass
-
-    content_response = _call_with_retry(
-        lambda: client.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_modalities=["IMAGE", "TEXT"],
-                safety_settings=_SAFETY_SETTINGS,
-            ),
-        ),
-        context="geração visual",
-        model_name=model_name,
-        kind="modelo visual",
-        retry_on_429=True,
-    )
-
-    payload = _extract_inline_image(content_response)
-    if not payload:
-        raise RuntimeError(
-            "Modelo retornou sem imagem. "
-            "Verifique se esse modelo suporta geração de imagem na Gemini API."
-        )
-
-    return payload
-
 def generate_post(raw_log: str) -> str:
     language_map = {"pt-br": "Português do Brasil", "en": "English"}
     language = language_map.get(config.POST_LANGUAGE, "Português do Brasil")
 
     system = _SYSTEM_PROMPT.format(language=language)
-
     user_prompt = (
         "Abaixo está o histórico de commits das últimas semanas. "
         "Aplique o filtro de NDA e gere o post LinkedIn conforme as instruções.\n\n"
@@ -371,10 +241,6 @@ def generate_post(raw_log: str) -> str:
 
 
 def generate_visual_assets(post_text: str, raw_log_summary: str, draft_id: str) -> list[dict]:
-    """
-    Gera imagens relacionadas ao post via modelo de imagem da Google.
-    Mantém o fluxo opcional e não interrompe o projeto caso falhe.
-    """
     if not config.ENABLE_VISUAL_ASSETS:
         return []
 
@@ -382,12 +248,61 @@ def generate_visual_assets(post_text: str, raw_log_summary: str, draft_id: str) 
 
     for model_name in _image_model_candidates():
         assets: list[dict] = []
-
         try:
             for idx in range(1, config.VISUAL_ASSET_COUNT + 1):
+                # 1. Cria a descrição curta usando o Gemini
                 prompt = _build_visual_prompt(post_text, raw_log_summary, variant=idx)
+                print(f"🎨 Prompt traduzido para a imagem ({len(prompt)} chars): '{prompt}'")
 
-                image_bytes, mime_type = _request_image_from_model(model_name, prompt)
+                # 2. Envia a descrição curta para o Imagen ou Flash Image
+                # ─── BIFURCAÇÃO DA API: Imagen vs Gemini ───
+                if "imagen" in model_name.lower():
+                    # Força o prompt a ser menor (250 chars) para evitar rejeição por tamanho
+                    safe_prompt = prompt[:250]
+                    print(f"🎨 Enviando para o Imagen (cortado por segurança): '{safe_prompt}'")
+                    
+                    result = _call_with_retry(
+                        lambda: client.models.generate_images(
+                            model=model_name,
+                            prompt=safe_prompt,
+                            config=types.GenerateImagesConfig(
+                                number_of_images=1
+                                # Removemos o aspect_ratio="16:9" que causa erro 400 em contas gratuitas/preview.
+                                # O Imagen vai gerar uma imagem quadrada (1:1) nativamente.
+                            )
+                        ),
+                        context="geração visual (Imagen)",
+                        model_name=model_name,
+                        kind="modelo visual",
+                        retry_on_429=True,
+                    )
+                    
+                    if not result.generated_images:
+                        raise RuntimeError("Modelo Imagen não retornou imagens.")
+                        
+                    image_bytes = result.generated_images[0].image.image_bytes
+                    mime_type = "image/png"
+                else:
+                    response = _call_with_retry(
+                        lambda: client.models.generate_content(
+                            model=model_name,
+                            contents=prompt,
+                            config=types.GenerateContentConfig(
+                                response_modalities=["IMAGE", "TEXT"],
+                                safety_settings=_SAFETY_SETTINGS,
+                            ),
+                        ),
+                        context="geração visual (Gemini)",
+                        model_name=model_name,
+                        kind="modelo visual",
+                        retry_on_429=True,
+                    )
+
+                    image_payload = _extract_inline_image(response)
+                    if not image_payload:
+                        raise RuntimeError("Modelo Gemini retornou sem imagem inline.")
+                    image_bytes, mime_type = image_payload
+
                 extension = _file_extension_for_mime(mime_type)
                 file_name = f"{draft_id}_visual_{idx}{extension}"
                 file_path = config.VISUALS_DIR / file_name
