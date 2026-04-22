@@ -8,6 +8,7 @@ Estrutura de um draft:
     "status": "pending" | "posted" | "discarded",
     "post_text": "...",
     "raw_log_summary": "...",
+    "visual_assets": [{"file_path": "...", "mime_type": "image/png"}],
     "telegram_message_id": 12345,
     "linkedin_post_id": "urn:li:share:..." | null
 }
@@ -36,7 +37,11 @@ def _save(data: dict) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def create_draft(post_text: str, raw_log_summary: str) -> str:
+def create_draft(
+    post_text: str,
+    raw_log_summary: str,
+    visual_assets: list[dict] | None = None,
+) -> str:
     """Persiste um novo draft com status 'pending'. Retorna o ID gerado."""
     draft_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     draft = {
@@ -45,6 +50,7 @@ def create_draft(post_text: str, raw_log_summary: str) -> str:
         "status": "pending",
         "post_text": post_text,
         "raw_log_summary": raw_log_summary,
+        "visual_assets": visual_assets or [],
         "telegram_message_id": None,
         "linkedin_post_id": None,
     }
@@ -68,7 +74,29 @@ def get_draft(draft_id: str) -> dict:
     data = _load()
     for draft in data["drafts"]:
         if draft["id"] == draft_id:
+            if "visual_assets" not in draft:
+                draft["visual_assets"] = []
             return draft
+    raise KeyError(f"Draft não encontrado: {draft_id}")
+
+
+def set_visual_assets(draft_id: str, visual_assets: list[dict]) -> None:
+    data = _load()
+    for draft in data["drafts"]:
+        if draft["id"] == draft_id:
+            draft["visual_assets"] = visual_assets
+            _save(data)
+            return
+    raise KeyError(f"Draft não encontrado: {draft_id}")
+
+
+def update_post_text(draft_id: str, post_text: str) -> None:
+    data = _load()
+    for draft in data["drafts"]:
+        if draft["id"] == draft_id:
+            draft["post_text"] = post_text
+            _save(data)
+            return
     raise KeyError(f"Draft não encontrado: {draft_id}")
 
 

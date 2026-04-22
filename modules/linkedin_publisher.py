@@ -10,6 +10,9 @@ Referência: https://learn.microsoft.com/en-us/linkedin/marketing/integrations/c
 """
 from __future__ import annotations
 
+import mimetypes
+from pathlib import Path
+
 import requests
 
 import config
@@ -52,12 +55,76 @@ def _get_user_urn() -> str:
     return f"urn:li:person:{sub}"
 
 
-def publish(post_text: str) -> str:
+def _register_image_upload(author_urn: str) -> tuple[str, str]:
+    payload = {
+        "registerUploadRequest": {
+            "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+            "owner": author_urn,
+            "serviceRelationships": [
+                {
+                    "relationshipType": "OWNER",
+                    "identifier": "urn:li:userGeneratedContent",
+                }
+            ],
+        }
+    }
+
+    resp = requests.post(
+        f"{_API_BASE}/assets?action=registerUpload",
+        headers=_headers(),
+        json=payload,
+        timeout=20,
+    )
+    resp.raise_for_status()
+
+    data = resp.json().get("value", {})
+    upload_mechanism = data.get("uploadMechanism", {}).get(
+        "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest", {}
+    )
+    upload_url = upload_mechanism.get("uploadUrl")
+    asset_urn = data.get("asset")
+
+    if not upload_url or not asset_urn:
+        raise RuntimeError(
+            "LinkedIn não retornou uploadUrl/asset para imagem. "
+            f"Resposta: {resp.text}"
+        )
+
+    return upload_url, asset_urn
+
+
+def _upload_image(author_urn: str, image_path: str) -> str:
+    path = Path(image_path)
+    if not path.exists() or not path.is_file():
+        raise FileNotFoundError(f"Imagem não encontrada para upload: {image_path}")
+
+    upload_url, asset_urn = _register_image_upload(author_urn)
+    content_type = mimetypes.guess_type(path.name)[0] or "image/png"
+
+    with open(path, "rb") as f:
+        upload_resp = requests.put(
+            upload_url,
+            data=f,
+            headers={"Content-Type": content_type},
+            timeout=60,
+        )
+
+    if upload_resp.status_code not in (200, 201):
+        raise requests.HTTPError(
+            f"Falha no upload da imagem ({upload_resp.status_code}): {upload_resp.text}",
+            response=upload_resp,
+        )
+
+    return asset_urn
+
+
+def publish(post_text: str, image_path: str | None = None) -> str:
     """
-    Cria um post de texto simples no LinkedIn.
+    Cria um post no LinkedIn (texto simples ou texto + imagem).
 
     Args:
         post_text: Texto completo do post (já aprovado pelo usuário).
+        image_path: Caminho opcional para imagem local a anexar no post.
 
     Returns:
         URN do post criado (ex: "urn:li:share:12345678").
@@ -68,16 +135,29 @@ def publish(post_text: str) -> str:
     """
     author_urn = _get_user_urn()
 
+    if image_path:
+        image_asset_urn = _upload_image(author_urn, image_path)
+        share_content = {
+            "shareCommentary": {"text": post_text},
+            "shareMediaCategory": "IMAGE",
+            "media": [
+                {
+                    "status": "READY",
+                    "media": image_asset_urn,
+                }
+            ],
+        }
+    else:
+        share_content = {
+            "shareCommentary": {"text": post_text},
+            "shareMediaCategory": "NONE",
+        }
+
     payload = {
         "author": author_urn,
         "lifecycleState": "PUBLISHED",
         "specificContent": {
-            "com.linkedin.ugc.ShareContent": {
-                "shareCommentary": {
-                    "text": post_text
-                },
-                "shareMediaCategory": "NONE",
-            }
+            "com.linkedin.ugc.ShareContent": share_content
         },
         "visibility": {
             "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"

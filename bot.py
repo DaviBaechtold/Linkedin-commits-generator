@@ -12,19 +12,26 @@ Uso manual (desenvolvimento):
   python3 bot.py
 
 Fluxo de callback:
-  Usuário clica em [🚀 Aprovar e Postar]
-    → bot recebe callback_data = "approve_<draft_id>"
+    Usuário clica em [♻️ Refazer texto]
+        → bot recebe callback_data = "regen_text_<draft_id>"
+        → regenera o texto e atualiza a mensagem de revisão
+
+    Usuário clica em [🖼️ Refazer imagem]
+        → bot recebe callback_data = "regen_image_<draft_id>"
+        → regenera a imagem e envia novamente no Telegram
+
+    Usuário clica em [✅ Aceitar]
+        → bot recebe callback_data = "accept_<draft_id>"
     → publica no LinkedIn
     → edita a mensagem Telegram com confirmação
 
-  Usuário clica em [❌ Descartar]
-    → bot recebe callback_data = "discard_<draft_id>"
+    Usuário clica em [❌ Reprovar]
+        → bot recebe callback_data = "reject_<draft_id>"
     → marca draft como descartado
     → edita a mensagem Telegram com confirmação
 """
 import asyncio
 import logging
-import sys
 
 from telegram import Update
 from telegram.ext import (
@@ -34,7 +41,7 @@ from telegram.ext import (
 )
 
 import config
-from modules import linkedin_publisher, state_manager, telegram_handler
+from modules import gemini_processor, linkedin_publisher, state_manager, telegram_handler
 
 logging.basicConfig(
     level=logging.INFO,
@@ -60,39 +67,157 @@ async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await query.answer()  # Remove o loading do botão imediatamente
 
     data: str = query.data
+    message_id = query.message.message_id if query.message else None
     log.info("Callback recebido: %s", data)
 
-    if data.startswith("approve_"):
+    if message_id is None:
+        log.warning("Callback sem message_id: %s", data)
+        return
+
+    if data.startswith("regen_text_"):
+        draft_id = data[len("regen_text_"):]
+        await _handle_regen_text(draft_id, message_id)
+
+    elif data.startswith("regen_image_"):
+        draft_id = data[len("regen_image_"):]
+        await _handle_regen_image(draft_id)
+
+    elif data.startswith("accept_"):
+        draft_id = data[len("accept_"):]
+        await _handle_approve(draft_id, message_id)
+
+    elif data.startswith("reject_"):
+        draft_id = data[len("reject_"):]
+        await _handle_discard(draft_id, message_id)
+
+    # Compatibilidade com mensagens antigas já enviadas
+    elif data.startswith("approve_"):
         draft_id = data[len("approve_"):]
-        await _handle_approve(draft_id, query.message.message_id)
+        await _handle_approve(draft_id, message_id)
 
     elif data.startswith("discard_"):
         draft_id = data[len("discard_"):]
-        await _handle_discard(draft_id, query.message.message_id)
+        await _handle_discard(draft_id, message_id)
 
     else:
         log.warning("Callback desconhecido: %s", data)
 
 
-async def _handle_approve(draft_id: str, message_id: int) -> None:
-    log.info("Aprovação recebida para draft %s. Publicando no LinkedIn...", draft_id)
-
+def _get_pending_draft(draft_id: str) -> dict | None:
     try:
         draft = state_manager.get_draft(draft_id)
     except KeyError:
         log.error("Draft não encontrado: %s", draft_id)
-        telegram_handler.edit_message_after_action(message_id, "error", draft_id)
-        return
+        return None
 
     if draft["status"] != "pending":
         log.warning("Draft %s já foi processado (status=%s).", draft_id, draft["status"])
         telegram_handler.send_error_alert(
             f"Draft {draft_id} já foi processado anteriormente (status: {draft['status']})."
         )
+        return None
+
+    return draft
+
+
+async def _handle_regen_text(draft_id: str, message_id: int) -> None:
+    log.info("Refazendo texto para draft %s...", draft_id)
+    draft = _get_pending_draft(draft_id)
+    if not draft:
+        telegram_handler.edit_message_after_action(message_id, "error", draft_id)
         return
 
     try:
-        post_urn = linkedin_publisher.publish(draft["post_text"])
+        new_text = await asyncio.to_thread(
+            gemini_processor.generate_post,
+            draft["raw_log_summary"],
+        )
+        await asyncio.to_thread(state_manager.update_post_text, draft_id, new_text)
+        await asyncio.to_thread(
+            telegram_handler.refresh_draft_review_message,
+            message_id,
+            draft_id,
+            new_text,
+        )
+        log.info("Texto do draft %s foi regenerado com sucesso.", draft_id)
+    except Exception as e:
+        log.exception("Erro ao refazer texto do draft %s: %s", draft_id, e)
+        telegram_handler.send_error_alert(
+            f"Falha ao refazer texto do draft {draft_id}:\n{e}"
+        )
+
+
+async def _handle_regen_image(draft_id: str) -> None:
+    log.info("Refazendo imagem para draft %s...", draft_id)
+    if not config.ENABLE_VISUAL_ASSETS:
+        telegram_handler.send_error_alert(
+            "Geração visual está desativada no .env (ENABLE_VISUAL_ASSETS=false)."
+        )
+        return
+
+    draft = _get_pending_draft(draft_id)
+    if not draft:
+        return
+
+    try:
+        visual_assets = await asyncio.to_thread(
+            gemini_processor.generate_visual_assets,
+            draft["post_text"],
+            draft["raw_log_summary"],
+            draft_id,
+        )
+        await asyncio.to_thread(state_manager.set_visual_assets, draft_id, visual_assets)
+        await asyncio.to_thread(
+            telegram_handler.send_visual_assets_for_review,
+            draft_id,
+            visual_assets,
+        )
+        log.info("Imagem(ns) do draft %s regenerada(s): %d", draft_id, len(visual_assets))
+    except Exception as e:
+        log.exception("Erro ao refazer imagem do draft %s: %s", draft_id, e)
+        error_msg = str(e)
+        guidance = (
+            "\n\nDica: defina GEMINI_IMAGE_MODEL com um modelo que tenha cota grátis "
+            "e configure GEMINI_IMAGE_FALLBACK_MODELS no .env."
+            if "Cota" in error_msg or "quota" in error_msg.lower()
+            else ""
+        )
+        telegram_handler.send_error_alert(
+            f"Falha ao refazer imagem do draft {draft_id}:\n{error_msg[:700]}{guidance}"
+        )
+
+
+async def _handle_approve(draft_id: str, message_id: int) -> None:
+    log.info("Aprovação recebida para draft %s. Publicando no LinkedIn...", draft_id)
+
+    draft = _get_pending_draft(draft_id)
+    if not draft:
+        telegram_handler.edit_message_after_action(message_id, "error", draft_id)
+        return
+
+    try:
+        visual_path = None
+        visual_assets = draft.get("visual_assets") or []
+        if config.LINKEDIN_PUBLISH_WITH_VISUAL and visual_assets:
+            visual_path = visual_assets[0].get("file_path")
+
+        if visual_path:
+            try:
+                post_urn = linkedin_publisher.publish(
+                    draft["post_text"],
+                    image_path=visual_path,
+                )
+            except Exception as visual_error:
+                if not config.LINKEDIN_FALLBACK_TEXT_IF_VISUAL_FAILS:
+                    raise
+                log.warning(
+                    "Falha ao publicar com imagem (%s). Aplicando fallback para texto.",
+                    visual_error,
+                )
+                post_urn = linkedin_publisher.publish(draft["post_text"])
+        else:
+            post_urn = linkedin_publisher.publish(draft["post_text"])
+
         state_manager.update_status(draft_id, "posted", linkedin_post_id=post_urn)
         telegram_handler.edit_message_after_action(message_id, "posted", draft_id)
         log.info("Post publicado no LinkedIn. URN: %s", post_urn)

@@ -5,8 +5,9 @@ generate.py — Script de geração de posts. Disparado pelo cron.
 Fluxo:
   1. Extrai commits dos repositórios locais configurados
   2. Chama a Gemini API para gerar o post (com filtro de NDA)
-  3. Persiste o draft em data/drafts.json
-  4. Envia o draft para o Telegram com botões de aprovação
+  3. (Opcional) Gera imagem/fluxograma via modelo visual do Gemini
+  4. Persiste o draft em data/drafts.json
+  5. Envia o draft para o Telegram com botões de aprovação
 
 Configuração do cron (a cada 2 semanas, às 09h de segunda-feira):
   0 9 * * 1 [ $(( $(date +\%W) \% 2 )) -eq 0 ] && /usr/bin/python3 /caminho/para/generate.py >> /caminho/para/logs/generate.log 2>&1
@@ -79,10 +80,33 @@ def main() -> int:
     )
     log.info("Draft persistido com ID: %s", draft_id)
 
-    # ── 4. Envio ao Telegram ───────────────────────────────────────────────────
+    # ── 4. Geração opcional de assets visuais ─────────────────────────────────
+    visual_assets: list[dict] = []
+    if config.ENABLE_VISUAL_ASSETS:
+        log.info(
+            "Gerando visual com Gemini (modelo: %s, estilo: %s)...",
+            config.GEMINI_IMAGE_MODEL,
+            config.VISUAL_ASSET_STYLE,
+        )
+        try:
+            visual_assets = gemini_processor.generate_visual_assets(
+                post_text=post_text,
+                raw_log_summary=log_summary,
+                draft_id=draft_id,
+            )
+            state_manager.set_visual_assets(draft_id, visual_assets)
+            log.info("Visual(is) gerado(s): %d", len(visual_assets))
+        except RuntimeError as e:
+            log.warning("Falha na geração visual; seguindo apenas com texto: %s", e)
+
+    # ── 5. Envio ao Telegram ───────────────────────────────────────────────────
     log.info("Enviando draft ao Telegram para revisão...")
     try:
-        message_id = telegram_handler.send_draft_for_review(draft_id, post_text)
+        message_id = telegram_handler.send_draft_for_review(
+            draft_id,
+            post_text,
+            visual_assets=visual_assets,
+        )
         state_manager.set_telegram_message_id(draft_id, message_id)
         log.info("Mensagem Telegram enviada (message_id=%d). Aguardando aprovação.", message_id)
     except Exception as e:

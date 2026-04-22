@@ -3,6 +3,8 @@ Processa o log de commits via Gemini API.
 Atualizado para usar o novo SDK 'google-genai'.
 """
 from __future__ import annotations
+import base64
+import re
 import time
 from google import genai
 from google.genai import types
@@ -59,6 +61,191 @@ REGRAS DE ESTILO (Otimizado para Leitura Mobile):
 OUTPUT: Apenas o texto do post, sem prefácio, sem explicações extras.
 """.strip()
 
+
+def _extract_retry_seconds(error_text: str) -> int | None:
+    patterns = [
+        r"retry in\s+([0-9]+(?:\.[0-9]+)?)s",
+        r"retryDelay['\"]?:\s*['\"]([0-9]+)s['\"]",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, error_text, flags=re.IGNORECASE)
+        if not match:
+            continue
+        try:
+            return max(1, int(float(match.group(1))))
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _compact_error_message(error_text: str, max_len: int = 280) -> str:
+    one_line = " ".join(error_text.split())
+    if len(one_line) <= max_len:
+        return one_line
+    return one_line[:max_len].rstrip() + "..."
+
+
+def _call_with_retry(
+    call,
+    context: str,
+    *,
+    model_name: str,
+    kind: str,
+    retry_on_429: bool = False,
+):
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            return call()
+        except Exception as e:
+            raw_error = str(e)
+
+            if "503" in raw_error and attempt < (max_retries - 1):
+                wait_time = 15 * (attempt + 1)
+                print(
+                    f"[Aviso] Servidor do Gemini ocupado em {context}. "
+                    f"Tentando novamente em {wait_time}s... "
+                    f"(Tentativa {attempt + 1}/{max_retries})"
+                )
+                time.sleep(wait_time)
+                continue
+
+            if retry_on_429 and "429" in raw_error:
+                raw_lower = raw_error.lower()
+                retry_seconds = _extract_retry_seconds(raw_error)
+
+                if "resource_exhausted" in raw_lower and "free_tier" in raw_lower and "limit: 0" in raw_lower:
+                    raise RuntimeError(
+                        f"Cota gratuita indisponível para {kind} '{model_name}'."
+                    )
+
+                if (
+                    attempt < (max_retries - 1)
+                    and retry_seconds is not None
+                    and retry_seconds <= config.GEMINI_RETRY_429_MAX_WAIT_SECONDS
+                ):
+                    print(
+                        f"[Aviso] Limite temporário de cota em {context} ({model_name}). "
+                        f"Aguardando {retry_seconds}s para retry... "
+                        f"(Tentativa {attempt + 1}/{max_retries})"
+                    )
+                    time.sleep(retry_seconds)
+                    continue
+
+                if retry_seconds is not None:
+                    raise RuntimeError(
+                        f"Cota temporária excedida para {kind} '{model_name}'. "
+                        f"Tente novamente em cerca de {retry_seconds}s."
+                    )
+
+                raise RuntimeError(
+                    f"Cota excedida para {kind} '{model_name}'. "
+                    "Tente novamente mais tarde ou ajuste o modelo visual."
+                )
+
+            raise RuntimeError(
+                f"Falha na API do Gemini ({context}, modelo '{model_name}'): "
+                f"{_compact_error_message(raw_error)}"
+            )
+
+
+def _decode_inline_data(data: bytes | str) -> bytes:
+    if isinstance(data, (bytes, bytearray)):
+        return bytes(data)
+    try:
+        return base64.b64decode(data)
+    except Exception:
+        return data.encode("utf-8", errors="ignore")
+
+
+def _extract_inline_image(response) -> tuple[bytes, str] | None:
+    candidates = getattr(response, "candidates", None) or []
+
+    for candidate in candidates:
+        content = getattr(candidate, "content", None)
+        parts = getattr(content, "parts", None) or []
+
+        for part in parts:
+            inline_data = getattr(part, "inline_data", None)
+            if inline_data is None and isinstance(part, dict):
+                inline_data = part.get("inline_data") or part.get("inlineData")
+            if not inline_data:
+                continue
+
+            mime_type = (
+                getattr(inline_data, "mime_type", None)
+                or getattr(inline_data, "mimeType", None)
+                or (inline_data.get("mime_type") if isinstance(inline_data, dict) else None)
+                or "image/png"
+            )
+            payload = getattr(inline_data, "data", None)
+            if payload is None and isinstance(inline_data, dict):
+                payload = inline_data.get("data")
+            if payload is None:
+                continue
+
+            image_bytes = _decode_inline_data(payload)
+            if image_bytes:
+                return image_bytes, mime_type
+
+    return None
+
+
+def _file_extension_for_mime(mime_type: str) -> str:
+    mapping = {
+        "image/png": ".png",
+        "image/jpeg": ".jpg",
+        "image/webp": ".webp",
+    }
+    return mapping.get(mime_type, ".png")
+
+
+def _build_visual_prompt(post_text: str, raw_log_summary: str, variant: int) -> str:
+    language_map = {"pt-br": "Português do Brasil", "en": "English"}
+    language = language_map.get(config.POST_LANGUAGE, "Português do Brasil")
+
+    style_guidance = {
+        "flowchart": (
+            "Crie um fluxograma limpo e profissional, formato horizontal 16:9, "
+            "com 4 etapas: Desafio, Abordagem, Aprendizado e Impacto."
+        ),
+        "illustration": (
+            "Crie uma ilustração editorial técnica, estilo moderno e limpo, "
+            "com foco em engenharia de software e aprendizado técnico."
+        ),
+        "auto": (
+            "Escolha automaticamente entre fluxograma visual ou ilustração técnica, "
+            "priorizando clareza para LinkedIn em mobile."
+        ),
+    }.get(config.VISUAL_ASSET_STYLE, "Crie um visual técnico limpo para LinkedIn.")
+
+    return (
+        "Você é um diretor de arte técnico para conteúdo de LinkedIn. "
+        "Gere uma imagem única de alto impacto visual e leitura rápida.\n\n"
+        "Regras obrigatórias:\n"
+        "- Idioma dos textos visíveis na arte: " + language + "\n"
+        "- Não inclua nomes de empresa, cliente, produto interno, endpoint ou código.\n"
+        "- Não use logos de marcas nem elementos com copyright.\n"
+        "- Evite texto excessivo; no máximo título + 4 blocos curtos.\n"
+        "- Tema técnico coerente com o post abaixo.\n\n"
+        "Direção visual:\n"
+        f"- {style_guidance}\n"
+        f"- Variante visual: {variant}.\n\n"
+        "Contexto resumido de commits:\n"
+        f"{raw_log_summary[:1200]}\n\n"
+        "Post base:\n"
+        f"{post_text[:2800]}\n"
+    )
+
+
+def _image_model_candidates() -> list[str]:
+    candidates = [config.GEMINI_IMAGE_MODEL, *config.GEMINI_IMAGE_FALLBACK_MODELS]
+    unique_candidates: list[str] = []
+    for model in candidates:
+        if model and model not in unique_candidates:
+            unique_candidates.append(model)
+    return unique_candidates
+
 def generate_post(raw_log: str) -> str:
     language_map = {"pt-br": "Português do Brasil", "en": "English"}
     language = language_map.get(config.POST_LANGUAGE, "Português do Brasil")
@@ -71,28 +258,90 @@ def generate_post(raw_log: str) -> str:
         f"--- INÍCIO DO LOG ---\n{raw_log}\n--- FIM DO LOG ---"
     )
 
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            response = client.models.generate_content(
-                model=config.GEMINI_MODEL,
-                contents=user_prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system,
-                    safety_settings=_SAFETY_SETTINGS,
-                )
+    response = _call_with_retry(
+        lambda: client.models.generate_content(
+            model=config.GEMINI_MODEL,
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system,
+                safety_settings=_SAFETY_SETTINGS,
             )
+        ),
+        context="geração de texto",
+        model_name=config.GEMINI_MODEL,
+        kind="modelo de texto",
+        retry_on_429=True,
+    )
 
-            if not response.text or not response.text.strip():
-                raise RuntimeError("Gemini retornou resposta vazia.")
+    if not response.text or not response.text.strip():
+        raise RuntimeError("Gemini retornou resposta vazia.")
 
-            return response.text.strip()
-        
-        except Exception as e:
-            # Se for erro 503 e ainda não passamos do limite de tentativas, espera e tenta de novo
-            if "503" in str(e) and attempt < (max_retries - 1):
-                wait_time = 15 * (attempt + 1) # Espera 15s, depois 30s...
-                print(f"[Aviso] Servidor do Gemini ocupado. Tentando novamente em {wait_time}s... (Tentativa {attempt + 1}/{max_retries})")
-                time.sleep(wait_time)
-            else:
-                raise RuntimeError(f"Falha na API do Gemini: {e}")
+    return response.text.strip()
+
+
+def generate_visual_assets(post_text: str, raw_log_summary: str, draft_id: str) -> list[dict]:
+    """
+    Gera imagens relacionadas ao post via modelo de imagem da Google.
+    Mantém o fluxo opcional e não interrompe o projeto caso falhe.
+    """
+    if not config.ENABLE_VISUAL_ASSETS:
+        return []
+
+    attempts: list[str] = []
+
+    for model_name in _image_model_candidates():
+        assets: list[dict] = []
+
+        try:
+            for idx in range(1, config.VISUAL_ASSET_COUNT + 1):
+                prompt = _build_visual_prompt(post_text, raw_log_summary, variant=idx)
+
+                response = _call_with_retry(
+                    lambda: client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            response_modalities=["IMAGE", "TEXT"],
+                            safety_settings=_SAFETY_SETTINGS,
+                        ),
+                    ),
+                    context="geração visual",
+                    model_name=model_name,
+                    kind="modelo visual",
+                    retry_on_429=True,
+                )
+
+                image_payload = _extract_inline_image(response)
+                if not image_payload:
+                    raise RuntimeError(
+                        "Modelo retornou sem imagem inline. "
+                        "Verifique se esse modelo suporta geração de imagem na Gemini API."
+                    )
+
+                image_bytes, mime_type = image_payload
+                extension = _file_extension_for_mime(mime_type)
+                file_name = f"{draft_id}_visual_{idx}{extension}"
+                file_path = config.VISUALS_DIR / file_name
+
+                with open(file_path, "wb") as f:
+                    f.write(image_bytes)
+
+                assets.append({
+                    "file_path": str(file_path),
+                    "mime_type": mime_type,
+                    "kind": config.VISUAL_ASSET_STYLE,
+                    "model": model_name,
+                })
+
+            return assets
+
+        except RuntimeError as e:
+            attempts.append(f"{model_name}: {e}")
+            continue
+
+    tested_models = ", ".join(_image_model_candidates())
+    detail = attempts[-1] if attempts else "sem detalhes"
+    raise RuntimeError(
+        "Falha na geração visual após tentar modelos disponíveis. "
+        f"Modelos testados: {tested_models}. Último erro: {detail}"
+    )

@@ -6,8 +6,9 @@ Automação de **personal branding** para LinkedIn que transforma seu histórico
 
 1. **Extração local de commits** — varre seus repositórios locais (via `git log`)
 2. **Geração inteligente com Gemini AI** — transforma commits em narrativa técnica, com filtro automático de NDA
-3. **Aprovação humana via Telegram** — você revisa e aprova antes de publicar
-4. **Publicação no LinkedIn** — posta direto na sua timeline pessoal
+3. **Visual opcional com modelo de imagem Google** — gera imagem/fluxograma para aumentar engajamento
+4. **Aprovação humana via Telegram** — você revisa e aprova antes de publicar
+5. **Publicação no LinkedIn** — posta direto na sua timeline pessoal (com fallback para texto)
 
 ## 🔐 Segurança & NDA
 
@@ -87,8 +88,33 @@ bash setup.sh
 ```bash
 cp .env.example .env
 # Preencha: GEMINI_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, 
-# LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, REPO_PATHS, GIT_AUTHOR_NAME
+# LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, REPO_PATHS, GIT_AUTHOR_NAME,
+# GEMINI_MODEL
 ```
+
+### 2.1 Ative o Modo Visual (Plano Gratuito)
+
+```env
+# Texto
+GEMINI_MODEL=gemini-1.5-flash
+
+# Imagem/fluxograma
+ENABLE_VISUAL_ASSETS=true
+GEMINI_IMAGE_MODEL=gemini-2.0-flash-preview-image-generation
+GEMINI_IMAGE_FALLBACK_MODELS=gemini-2.0-flash-preview-image-generation
+GEMINI_RETRY_429_MAX_WAIT_SECONDS=75
+VISUAL_ASSET_STYLE=flowchart
+VISUAL_ASSET_COUNT=1
+
+# Publicação
+LINKEDIN_PUBLISH_WITH_VISUAL=true
+LINKEDIN_FALLBACK_TEXT_IF_VISUAL_FAILS=true
+```
+
+Observações:
+- O projeto segue funcionando mesmo se a geração visual falhar (publica texto normalmente).
+- A disponibilidade do modelo visual depende da cota do plano gratuito no Gemini API.
+- Alguns modelos preview de imagem podem ter cota gratuita zero em certas contas/projetos. Nesses casos, use fallback para um modelo com free tier ativo.
 
 ### 3. Obtenha o Token LinkedIn
 
@@ -127,7 +153,7 @@ systemctl --user status linkedin-branding-bot
 ## 📝 Stack Tecnológico
 
 - **Extração:** `GitPython`
-- **IA:** `google-generativeai` (Gemini 1.5 Pro)
+- **IA (texto + visual):** `google-generativeai` (Gemini)
 - **Telegram:** `python-telegram-bot` (Long Polling)
 - **LinkedIn:** `requests` (UGC Posts API v2)
 - **Orquestração:** `cron` + `systemd`
