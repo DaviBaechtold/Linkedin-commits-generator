@@ -80,24 +80,22 @@ def main() -> int:
     )
     log.info("Draft persistido com ID: %s", draft_id)
 
-    # ── 4. Geração opcional de assets visuais ─────────────────────────────────
+    # ── 4. Geração opcional de imagem (Pollinations.ai — gratuito) ───────────────
     visual_assets: list[dict] = []
     if config.ENABLE_VISUAL_ASSETS:
-        log.info(
-            "Gerando visual com Gemini (modelo: %s, estilo: %s)...",
-            config.GEMINI_IMAGE_MODEL,
-            config.VISUAL_ASSET_STYLE,
-        )
+        log.info("Gerando imagem via Pollinations.ai (gratuito, sem API key)...")
         try:
-            visual_assets = gemini_processor.generate_visual_assets(
+            from modules import image_generator
+            img_path = image_generator.generate(
                 post_text=post_text,
-                raw_log_summary=log_summary,
                 draft_id=draft_id,
+                style=config.VISUAL_ASSET_STYLE,
             )
+            visual_assets = [{"file_path": str(img_path), "mime_type": "image/jpeg"}]
             state_manager.set_visual_assets(draft_id, visual_assets)
-            log.info("Visual(is) gerado(s): %d", len(visual_assets))
+            log.info("Imagem gerada: %s", img_path)
         except RuntimeError as e:
-            log.warning("Falha na geração visual; seguindo apenas com texto: %s", e)
+            log.warning("Falha na geração de imagem; seguindo apenas com texto: %s", e)
 
     # ── 5. Envio ao Telegram ───────────────────────────────────────────────────
     log.info("Enviando draft ao Telegram para revisão...")

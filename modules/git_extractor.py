@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import subprocess
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 
 import config
@@ -38,6 +37,7 @@ def _run_git_log(repo_path: Path, author: str, since: str) -> list[str]:
         "git",
         "-C", str(repo_path),
         "log",
+        "--all",                # todos os branches locais
         f"--author={author}",
         f"--since={since}",
         "-n", "50",             # máximo 50 commits por repositório
