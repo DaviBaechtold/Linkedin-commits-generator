@@ -30,7 +30,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="mb-8 text-center">
           <div className="mb-3 inline-flex items-center justify-center rounded-xl bg-brand/15 p-3">
-            <GitBranch className="h-7 w-7 text-brand-light" />
+            <GitBranch className="h-7 w-7 text-brand-light" suppressHydrationWarning />
           </div>
           <h1 className="text-xl font-semibold text-white">
             Entrar no CommitPost
@@ -47,7 +47,7 @@ export default function LoginPage() {
             disabled={loading}
             className="btn-secondary w-full justify-center py-3"
           >
-            <Github className="h-5 w-5" />
+            <Github className="h-5 w-5" suppressHydrationWarning />
             {loading ? "Redirecionando..." : "Continuar com GitHub"}
           </button>
 

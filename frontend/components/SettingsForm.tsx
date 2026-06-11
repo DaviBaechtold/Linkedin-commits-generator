@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { UserPreferences } from "@/lib/supabase/types";
-import { Linkedin, CheckCircle, AlertCircle, Loader2, Save } from "lucide-react";
+import { Linkedin, CheckCircle, AlertCircle, Loader2, Save, Trash2 } from "lucide-react";
 
 interface Props {
   preferences: UserPreferences | null;
@@ -17,6 +18,7 @@ export default function SettingsForm({
   linkedinExpiry,
   linkedinUsername,
 }: Props) {
+  const router = useRouter();
   const [prefs, setPrefs] = useState({
     post_language: preferences?.post_language ?? "pt-BR",
     enable_images: preferences?.enable_images ?? true,
@@ -25,6 +27,9 @@ export default function SettingsForm({
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const linkedinExpired =
     linkedinExpiry && new Date(linkedinExpiry) < new Date();
@@ -46,6 +51,24 @@ export default function SettingsForm({
 
   function connectLinkedIn() {
     window.location.href = "/api/auth/linkedin";
+  }
+
+  async function deleteAccount() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch("/api/account", { method: "DELETE" });
+      if (!res.ok) {
+        const json = await res.json();
+        setDeleteError(json.error ?? "Falha ao excluir conta.");
+        return;
+      }
+      router.push("/login");
+    } catch {
+      setDeleteError("Erro de conexão. Tente novamente.");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -72,7 +95,7 @@ export default function SettingsForm({
                 )}
               </div>
             </div>
-            <button onClick={connectLinkedIn} className="btn-secondary text-xs py-1.5">
+            <button onClick={connectLinkedIn} className="btn-ghost">
               Reconectar
             </button>
           </div>
@@ -195,6 +218,47 @@ export default function SettingsForm({
             <span className="text-sm text-green-400">Salvo!</span>
           )}
         </div>
+      </section>
+      {/* Zona de perigo */}
+      <section className="card border-red-500/20">
+        <h2 className="mb-1 text-sm font-semibold text-red-400">
+          Zona de perigo
+        </h2>
+        <p className="mb-4 text-xs text-white/40">
+          A exclusão de conta é permanente e irreversível. Todos os seus
+          rascunhos, repositórios e integrações serão deletados imediatamente,
+          conforme a LGPD.
+        </p>
+
+        {deleteError && (
+          <p className="mb-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
+            {deleteError}
+          </p>
+        )}
+
+        <label className="label text-white/50">
+          Digite <span className="font-mono text-red-400">EXCLUIR</span> para confirmar
+        </label>
+        <input
+          className="input mb-3 max-w-xs"
+          value={deleteConfirm}
+          onChange={(e) => setDeleteConfirm(e.target.value)}
+          placeholder="EXCLUIR"
+          autoComplete="off"
+        />
+
+        <button
+          onClick={deleteAccount}
+          disabled={deleteConfirm !== "EXCLUIR" || deleting}
+          className="btn-danger-outline"
+        >
+          {deleting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Trash2 className="h-4 w-4" />
+          )}
+          Excluir minha conta
+        </button>
       </section>
     </div>
   );
