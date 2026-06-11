@@ -6,12 +6,17 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const supabase = await createClient();
 
-  const [prefsResult, linkedinResult] = await Promise.all([
+  const [prefsResult, linkedinResult, geminiResult] = await Promise.all([
     supabase.from("user_preferences").select("*").maybeSingle(),
     supabase
       .from("integrations")
       .select("id,provider_username,expires_at")
       .eq("provider", "linkedin")
+      .maybeSingle(),
+    supabase
+      .from("integrations")
+      .select("access_token")
+      .eq("provider", "gemini")
       .maybeSingle(),
   ]);
 
@@ -24,6 +29,11 @@ export default async function SettingsPage() {
   const linkedinConnected = !!linkedinData;
   const linkedinExpiry = linkedinData?.expires_at ?? null;
   const linkedinUsername = linkedinData?.provider_username ?? null;
+
+  // Passa apenas os últimos 4 chars da chave — nunca a chave completa para o cliente
+  const geminiKey = (geminiResult.data as { access_token: string } | null)?.access_token ?? null;
+  const geminiConnected = !!geminiKey;
+  const geminiKeyHint = geminiKey ? `...${geminiKey.slice(-4)}` : null;
 
   return (
     <div className="mx-auto max-w-xl">
@@ -39,6 +49,8 @@ export default async function SettingsPage() {
         linkedinConnected={linkedinConnected}
         linkedinExpiry={linkedinExpiry}
         linkedinUsername={linkedinUsername}
+        geminiConnected={geminiConnected}
+        geminiKeyHint={geminiKeyHint}
       />
     </div>
   );

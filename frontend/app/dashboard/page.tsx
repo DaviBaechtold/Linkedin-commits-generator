@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  const [draftsResult, linkedinResult, reposResult] = await Promise.all([
+  const [draftsResult, linkedinResult, reposResult, geminiResult] = await Promise.all([
     supabase
       .from("drafts")
       .select("*")
@@ -23,11 +23,17 @@ export default async function DashboardPage() {
       .from("repos")
       .select("id")
       .eq("enabled", true),
+    supabase
+      .from("integrations")
+      .select("id")
+      .eq("provider", "gemini")
+      .maybeSingle(),
   ]);
 
   const drafts = (draftsResult.data ?? []) as Draft[];
   const hasLinkedIn = !!linkedinResult.data;
   const hasRepos = (reposResult.data?.length ?? 0) > 0;
+  const hasGemini = !!geminiResult.data;
 
   const pendingCount = drafts.filter((d) => d.status === "pending").length;
 
@@ -46,14 +52,24 @@ export default async function DashboardPage() {
         <GenerateButton
           hasLinkedIn={hasLinkedIn}
           hasRepos={hasRepos}
+          hasGemini={hasGemini}
         />
       </div>
 
       {/* Onboarding incompleto */}
-      {(!hasLinkedIn || !hasRepos) && (
+      {(!hasLinkedIn || !hasRepos || !hasGemini) && (
         <div className="mb-6 rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-yellow-300/80">
-          {!hasLinkedIn && (
+          {!hasGemini && (
             <p>
+              Configure sua{" "}
+              <a href="/dashboard/settings" className="underline">
+                Gemini API Key
+              </a>{" "}
+              para gerar posts com IA.
+            </p>
+          )}
+          {!hasLinkedIn && (
+            <p className={!hasGemini ? "mt-1" : ""}>
               Conecte seu LinkedIn em{" "}
               <a href="/dashboard/settings" className="underline">
                 Configurações
@@ -62,7 +78,7 @@ export default async function DashboardPage() {
             </p>
           )}
           {!hasRepos && (
-            <p className="mt-1">
+            <p className={!hasGemini || !hasLinkedIn ? "mt-1" : ""}>
               Adicione repositórios em{" "}
               <a href="/dashboard/repos" className="underline">
                 Repositórios

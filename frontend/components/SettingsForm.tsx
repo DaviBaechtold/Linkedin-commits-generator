@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { UserPreferences } from "@/lib/supabase/types";
-import { Linkedin, CheckCircle, AlertCircle, Loader2, Save, Trash2 } from "lucide-react";
+import { Linkedin, CheckCircle, AlertCircle, Loader2, Save, Trash2, Key, ExternalLink } from "lucide-react";
 
 interface Props {
   preferences: UserPreferences | null;
   linkedinConnected: boolean;
   linkedinExpiry: string | null;
   linkedinUsername: string | null;
+  geminiConnected: boolean;
+  geminiKeyHint: string | null;
 }
 
 export default function SettingsForm({
@@ -17,6 +19,8 @@ export default function SettingsForm({
   linkedinConnected,
   linkedinExpiry,
   linkedinUsername,
+  geminiConnected,
+  geminiKeyHint,
 }: Props) {
   const router = useRouter();
   const [prefs, setPrefs] = useState({
@@ -27,6 +31,11 @@ export default function SettingsForm({
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [geminiKey, setGeminiKey] = useState("");
+  const [geminiSaving, setGeminiSaving] = useState(false);
+  const [geminiSaved, setGeminiSaved] = useState(geminiConnected);
+  const [geminiHint, setGeminiHint] = useState(geminiKeyHint);
+  const [geminiError, setGeminiError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -51,6 +60,40 @@ export default function SettingsForm({
 
   function connectLinkedIn() {
     window.location.href = "/api/auth/linkedin";
+  }
+
+  async function saveGeminiKey() {
+    setGeminiSaving(true);
+    setGeminiError(null);
+    try {
+      const res = await fetch("/api/integrations/gemini", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: geminiKey }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setGeminiError(json.error ?? "Falha ao salvar chave.");
+        return;
+      }
+      setGeminiSaved(true);
+      setGeminiHint(`...${geminiKey.trim().slice(-4)}`);
+      setGeminiKey("");
+    } finally {
+      setGeminiSaving(false);
+    }
+  }
+
+  async function removeGeminiKey() {
+    setGeminiSaving(true);
+    setGeminiError(null);
+    try {
+      await fetch("/api/integrations/gemini", { method: "DELETE" });
+      setGeminiSaved(false);
+      setGeminiHint(null);
+    } finally {
+      setGeminiSaving(false);
+    }
   }
 
   async function deleteAccount() {
@@ -118,6 +161,76 @@ export default function SettingsForm({
                 Conectar LinkedIn
               </button>
             </div>
+          </div>
+        )}
+      </section>
+
+      {/* Gemini API Key */}
+      <section className="card flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <Key className="h-4 w-4 text-brand-light" />
+          <h2 className="text-sm font-semibold text-white/80">Gemini API Key</h2>
+        </div>
+
+        {geminiSaved ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-400" />
+              <div>
+                <p className="text-sm text-white/80">Conectado</p>
+                {geminiHint && (
+                  <p className="text-xs text-white/30 font-mono">{geminiHint}</p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={removeGeminiKey}
+              disabled={geminiSaving}
+              className="btn-ghost"
+            >
+              {geminiSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              Remover
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <p className="text-xs text-white/40">
+              O CommitPost usa sua própria chave Gemini — você controla o uso e a quota.{" "}
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-0.5 text-brand-light hover:underline"
+              >
+                Obter chave no AI Studio
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </p>
+            {geminiError && (
+              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                {geminiError}
+              </p>
+            )}
+            <input
+              type="password"
+              className="input"
+              value={geminiKey}
+              onChange={(e) => setGeminiKey(e.target.value)}
+              placeholder="AIzaSy..."
+              autoComplete="off"
+            />
+            <button
+              onClick={saveGeminiKey}
+              disabled={geminiSaving || !geminiKey.trim()}
+              className="btn-primary self-start"
+            >
+              {geminiSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Key className="h-4 w-4" />
+              )}
+              Salvar chave
+            </button>
           </div>
         )}
       </section>

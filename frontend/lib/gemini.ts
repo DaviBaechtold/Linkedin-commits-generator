@@ -1,8 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite-preview";
-const GEMINI_IMAGE_MODEL =
-  process.env.GEMINI_IMAGE_MODEL ?? "gemini-2.0-flash-preview-image-generation";
 
 const NDA_SYSTEM_PROMPT = `Você é um especialista em marketing de conteúdo para desenvolvedores no LinkedIn.
 Gere posts profissionais e autênticos a partir de commits de código.
@@ -46,12 +44,13 @@ function buildImagePrompt(postText: string, style: string): string {
   return `Abstract visualization of software development and engineering progress. ${styleDesc}. Square format 1080x1080. No text, no code, no people. Suitable for LinkedIn post illustration.`;
 }
 
-/** Gera texto do post com retry em quota errors */
+/** Gera texto do post usando a chave Gemini do próprio usuário */
 export async function generatePostText(
   rawLog: string,
-  language: string
+  language: string,
+  apiKey: string
 ): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+  const ai = new GoogleGenAI({ apiKey });
 
   const models = [
     GEMINI_MODEL,
@@ -76,13 +75,21 @@ export async function generatePostText(
       if (text.trim()) return text.trim();
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
-      // Quota esgotada — tenta próximo modelo
       if (status === 429 || status === 503) continue;
       throw err;
     }
   }
 
   throw new Error("Todos os modelos Gemini falharam ou quota esgotada.");
+}
+
+/** Regenera texto a partir do log summary já armazenado */
+export async function regeneratePostText(
+  rawLogSummary: string,
+  language: string,
+  apiKey: string
+): Promise<string> {
+  return generatePostText(rawLogSummary, language, apiKey);
 }
 
 /** Gera imagem via Pollinations.ai (gratuito, sem key) */
@@ -100,21 +107,12 @@ export async function generateImagePollinations(
   url.searchParams.set("seed", String(seed));
   url.searchParams.set("nologo", "true");
 
-  // Verifica que a URL responde (HEAD request)
   try {
     const res = await fetch(url.toString(), { method: "HEAD" });
     if (res.ok) return url.toString();
   } catch {
-    // Silencia — imagem é opcional
+    // Imagem é opcional — falha silenciosa
   }
 
   return null;
-}
-
-/** Regenera texto a partir do log summary já armazenado */
-export async function regeneratePostText(
-  rawLogSummary: string,
-  language: string
-): Promise<string> {
-  return generatePostText(rawLogSummary, language);
 }

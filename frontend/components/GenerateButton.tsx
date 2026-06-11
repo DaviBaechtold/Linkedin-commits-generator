@@ -7,14 +7,20 @@ import { Sparkles, Loader2 } from "lucide-react";
 interface Props {
   hasLinkedIn: boolean;
   hasRepos: boolean;
+  hasGemini: boolean;
 }
 
-export default function GenerateButton({ hasLinkedIn, hasRepos }: Props) {
+export default function GenerateButton({ hasLinkedIn, hasRepos, hasGemini }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const canGenerate = hasRepos;
+  const canGenerate = hasRepos && hasGemini;
+  const disabledReason = !hasGemini
+    ? "Configure sua Gemini API Key em Configurações"
+    : !hasRepos
+    ? "Adicione repositórios primeiro"
+    : undefined;
 
   async function handleGenerate() {
     setLoading(true);
@@ -40,7 +46,7 @@ export default function GenerateButton({ hasLinkedIn, hasRepos }: Props) {
         onClick={handleGenerate}
         disabled={!canGenerate || loading}
         className="btn-primary"
-        title={!hasRepos ? "Adicione repositórios primeiro" : undefined}
+        title={disabledReason}
       >
         {loading ? (
           <Loader2 className="h-4 w-4 animate-spin" />

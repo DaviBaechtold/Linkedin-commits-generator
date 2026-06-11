@@ -27,8 +27,8 @@ export async function POST() {
 
   const service = createServiceClient();
 
-  // Carrega repos ativos + prefs + GitHub token em paralelo
-  const [reposResult, prefsResult, ghIntegration] = await Promise.all([
+  // Carrega repos ativos + prefs + integrações em paralelo
+  const [reposResult, prefsResult, ghIntegration, geminiIntegration] = await Promise.all([
     service
       .from("repos")
       .select("*")
@@ -45,12 +45,26 @@ export async function POST() {
       .eq("user_id", user.id)
       .eq("provider", "github")
       .maybeSingle(),
+    service
+      .from("integrations")
+      .select("access_token")
+      .eq("user_id", user.id)
+      .eq("provider", "gemini")
+      .maybeSingle(),
   ]);
 
   const repos = reposResult.data ?? [];
   if (repos.length === 0) {
     return NextResponse.json(
       { error: "Nenhum repositório ativo. Adicione repos primeiro." },
+      { status: 400 }
+    );
+  }
+
+  const geminiApiKey = geminiIntegration?.data?.access_token;
+  if (!geminiApiKey) {
+    return NextResponse.json(
+      { error: "Chave Gemini não configurada. Adicione sua API Key em Configurações." },
       { status: 400 }
     );
   }
@@ -95,7 +109,7 @@ export async function POST() {
   // Gera post com Gemini
   let postText: string;
   try {
-    postText = await generatePostText(rawLogSummary, language);
+    postText = await generatePostText(rawLogSummary, language, geminiApiKey);
   } catch (err) {
     console.error("Gemini error:", err);
     return NextResponse.json(
