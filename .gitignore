@@ -1,7 +1,20 @@
+# Env
 .env
-.venv/
-__pycache__/
-*.pyc
-data/drafts.json
-logs/
+frontend/.env.local
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build
+frontend/.next/
+frontend/out/
+
+# Vercel
+.vercel
+
+# OS
 .DS_Store
+
+# Supabase temp
+supabase/.temp/

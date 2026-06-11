@@ -140,7 +140,6 @@ npm run dev
 │   │   ├── github.ts
 │   │   └── rate-limit.ts
 │   └── .env.local.example
-├── supabase/
-│   └── migrations/001_initial.sql
-└── modules/           ← Python original (uso local)
+└── supabase/
+    └── migrations/001_initial.sql
 ```

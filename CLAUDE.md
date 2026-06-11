@@ -2,28 +2,28 @@
 
 ## O que é este projeto
 
-Duas partes independentes:
+**CommitPost** — SaaS web que transforma commits do GitHub em posts profissionais para o LinkedIn, com filtro NDA automático.
 
-1. **Pipeline Python (raiz)** — automação local que extrai commits de repos no disco, gera post via Gemini, envia para revisão no Telegram e publica no LinkedIn após aprovação. Roda via cron + systemd.
-
-2. **SaaS Web (`/frontend`)** — Next.js 15 + Supabase + Vercel. Mesma lógica, mas multiusuário: GitHub OAuth para login, GitHub API para commits, dashboard web no lugar do Telegram.
+Stack: Next.js 15 (App Router) + Supabase + Vercel.
 
 ## Stack
 
-| Camada | Python (local) | Web (SaaS) |
-|---|---|---|
-| Auth | `.env` manual | Supabase Auth (GitHub OAuth) |
-| Commits | `git log` local | GitHub API |
-| IA | Gemini (`google-genai`) | Gemini (`@google/genai`) |
-| Imagens | Pollinations.ai | Pollinations.ai |
-| Revisão | Telegram bot | Dashboard Next.js |
-| Publicação | LinkedIn UGC API v2 | LinkedIn UGC API v2 |
-| Estado | `data/drafts.json` | Supabase PostgreSQL |
+| Camada | Tecnologia |
+|---|---|
+| Auth | Supabase Auth (GitHub OAuth) |
+| Commits | GitHub API |
+| IA (texto) | Gemini (`@google/genai`) |
+| Imagens | Pollinations.ai (gratuito, sem key) |
+| Revisão | Dashboard Next.js |
+| Publicação | LinkedIn UGC API v2 |
+| Estado | Supabase PostgreSQL |
 
 ## Modelo Gemini
 
 O modelo padrão desta key é `gemini-3.1-flash-lite-preview`.  
 `gemini-2.0-flash` tem quota esgotada no free tier — não usar como padrão.
+
+Fallback chain: `gemini-3.1-flash-lite-preview` → `gemini-2.5-flash-lite-preview-06-17` → `gemini-1.5-flash`
 
 ## Estrutura do frontend
 
@@ -91,5 +91,4 @@ vercel                              # segue o wizard
 
 ## Arquivos sensíveis
 
-`frontend/.env.local` — nunca commitar (está no `.gitignore`).  
-O `.env` na raiz é do pipeline Python — também nunca commitar.
+`frontend/.env.local` — nunca commitar (está no `.gitignore`).
