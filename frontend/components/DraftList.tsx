@@ -10,6 +10,9 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
+  Copy,
+  Pencil,
+  CheckCheck,
 } from "lucide-react";
 
 interface Props {
@@ -54,18 +57,27 @@ function DraftCard({
 }) {
   const [expanded, setExpanded] = useState(draft.status === "pending");
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(draft.post_text);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function apiAction(
     action: "publish" | "discard" | "regen_text" | "regen_image"
   ) {
+    setError(null);
+
     if (action === "publish") {
       const res = await fetch(`/api/drafts/${draft.id}/publish`, {
         method: "POST",
       });
-      if (res.ok) {
-        const updated = await res.json();
-        onUpdate(updated);
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Falha ao publicar.");
+        return;
       }
+      onUpdate(json);
       return;
     }
 
@@ -75,7 +87,12 @@ function DraftCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "discarded" }),
       });
-      if (res.ok) onUpdate({ ...draft, status: "discarded" });
+      if (!res.ok) {
+        const json = await res.json();
+        setError(json.error ?? "Falha ao descartar.");
+        return;
+      }
+      onUpdate({ ...draft, status: "discarded" });
       return;
     }
 
@@ -86,10 +103,14 @@ function DraftCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "text" }),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        onUpdate(updated);
+      const json = await res.json();
+      if (!res.ok) {
+        onUpdate({ ...draft, status: "pending" });
+        setError(json.error ?? "Falha ao regenerar texto.");
+        return;
       }
+      setEditText(json.post_text);
+      onUpdate(json);
       return;
     }
 
@@ -99,10 +120,45 @@ function DraftCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "image" }),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        onUpdate(updated);
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Falha ao regenerar imagem.");
+        return;
       }
+      onUpdate(json);
+    }
+  }
+
+  async function saveEdit() {
+    const trimmed = editText.trim();
+    if (!trimmed || trimmed === draft.post_text) {
+      setEditing(false);
+      return;
+    }
+    setSavingEdit(true);
+    setError(null);
+    const res = await fetch(`/api/drafts/${draft.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ post_text: trimmed }),
+    });
+    const json = await res.json();
+    setSavingEdit(false);
+    if (!res.ok) {
+      setError(json.error ?? "Falha ao salvar edição.");
+      return;
+    }
+    onUpdate(json);
+    setEditing(false);
+  }
+
+  async function copyText() {
+    try {
+      await navigator.clipboard.writeText(draft.post_text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback silencioso
     }
   }
 
@@ -114,7 +170,7 @@ function DraftCard({
   }[draft.status];
 
   const isActive = draft.status === "pending";
-  const isLoading = draft.status === "regenerating" || isPending;
+  const isLoading = draft.status === "regenerating" || isPending || savingEdit;
 
   return (
     <div className="card">
@@ -143,17 +199,47 @@ function DraftCard({
         </button>
       </div>
 
-      {/* Post text preview */}
-      <p
-        className={`mt-3 whitespace-pre-wrap text-sm leading-relaxed text-white/75 ${
-          !expanded ? "line-clamp-3" : ""
-        }`}
-      >
-        {draft.post_text}
-      </p>
+      {/* Post text — preview or edit */}
+      {editing ? (
+        <div className="mt-3">
+          <textarea
+            className="input min-h-[180px] resize-y"
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            autoFocus
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={saveEdit}
+              disabled={savingEdit}
+              className="btn-primary text-xs py-1.5"
+            >
+              <Check className="h-3.5 w-3.5" />
+              Salvar
+            </button>
+            <button
+              onClick={() => {
+                setEditText(draft.post_text);
+                setEditing(false);
+              }}
+              className="btn-secondary text-xs py-1.5"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p
+          className={`mt-3 whitespace-pre-wrap text-sm leading-relaxed text-white/75 ${
+            !expanded ? "line-clamp-3" : ""
+          }`}
+        >
+          {draft.post_text}
+        </p>
+      )}
 
       {/* Images */}
-      {expanded && draft.visual_assets && draft.visual_assets.length > 0 && (
+      {expanded && !editing && draft.visual_assets && draft.visual_assets.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {draft.visual_assets.map((asset, i) => (
             // eslint-disable-next-line @next/next/no-img-element
@@ -167,8 +253,15 @@ function DraftCard({
         </div>
       )}
 
+      {/* Error */}
+      {error && (
+        <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          {error}
+        </p>
+      )}
+
       {/* Actions */}
-      {expanded && isActive && (
+      {expanded && isActive && !editing && (
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             onClick={() => startTransition(() => apiAction("publish"))}
@@ -177,6 +270,29 @@ function DraftCard({
           >
             <Check className="h-4 w-4" />
             Publicar
+          </button>
+          <button
+            onClick={() => {
+              setEditText(draft.post_text);
+              setEditing(true);
+            }}
+            disabled={isLoading}
+            className="btn-secondary"
+          >
+            <Pencil className="h-4 w-4" />
+            Editar
+          </button>
+          <button
+            onClick={copyText}
+            disabled={isLoading}
+            className="btn-secondary"
+          >
+            {copied ? (
+              <CheckCheck className="h-4 w-4 text-green-400" />
+            ) : (
+              <Copy className="h-4 w-4" />
+            )}
+            {copied ? "Copiado!" : "Copiar"}
           </button>
           <button
             onClick={() => startTransition(() => apiAction("regen_text"))}
@@ -201,6 +317,20 @@ function DraftCard({
           >
             <X className="h-4 w-4" />
             Descartar
+          </button>
+        </div>
+      )}
+
+      {/* Copy button for non-active drafts */}
+      {expanded && !isActive && draft.status !== "regenerating" && (
+        <div className="mt-3">
+          <button onClick={copyText} className="btn-secondary text-xs py-1.5">
+            {copied ? (
+              <CheckCheck className="h-3.5 w-3.5 text-green-400" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+            {copied ? "Copiado!" : "Copiar texto"}
           </button>
         </div>
       )}

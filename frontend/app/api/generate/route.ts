@@ -125,7 +125,7 @@ export async function POST() {
       visual_assets: visualAssets,
       status: "pending",
       repos_used: repos.map((r) => r.alias),
-      model_used: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
+      model_used: process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite-preview",
     })
     .select()
     .single();

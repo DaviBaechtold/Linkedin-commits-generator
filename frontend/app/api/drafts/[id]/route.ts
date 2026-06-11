@@ -31,7 +31,9 @@ export async function PATCH(
   }
 
   if (body.post_text !== undefined) {
-    update.post_text = String(body.post_text);
+    const text = String(body.post_text).trim();
+    if (!text) return NextResponse.json({ error: "Texto não pode ser vazio." }, { status: 400 });
+    update.post_text = text;
   }
 
   const service = createServiceClient();
