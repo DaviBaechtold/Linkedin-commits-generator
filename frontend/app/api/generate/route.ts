@@ -3,8 +3,9 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { checkRateLimit, logUsage } from "@/lib/rate-limit";
 import { fetchCommits, formatCommitsForPrompt, type GitHubCommit } from "@/lib/github";
 import { generatePostText, type AIConfig } from "@/lib/ai";
-import { generateImagePollinations } from "@/lib/gemini";
+import { generateImage, type ImageConfig } from "@/lib/image";
 import { getDefaultModel, type AIProvider } from "@/lib/ai-providers";
+import type { ImageProvider } from "@/lib/image-providers";
 
 export const maxDuration = 60;
 
@@ -56,6 +57,7 @@ export async function POST() {
   sinceDate.setDate(sinceDate.getDate() - (prefs?.commits_since_days ?? 30));
   const enableImages = prefs?.enable_images ?? true;
   const imageStyle = prefs?.image_style ?? "professional";
+  const imageProvider = ((prefs?.image_provider as ImageProvider) ?? "pollinations") as ImageProvider;
 
   const { data: aiIntegration } = await service
     .from("integrations")
@@ -115,7 +117,26 @@ export async function POST() {
   let visualAssets: { url: string; mime_type: string }[] = [];
 
   if (enableImages) {
-    const imageUrl = await generateImagePollinations(postText, draftId, imageStyle);
+    let imageApiKey: string | undefined;
+    if (imageProvider === "dalle") {
+      const { data } = await service
+        .from("integrations")
+        .select("access_token")
+        .eq("user_id", user.id)
+        .eq("provider", "openai")
+        .maybeSingle();
+      imageApiKey = data?.access_token ?? undefined;
+    } else if (imageProvider === "fal") {
+      const { data } = await service
+        .from("integrations")
+        .select("access_token")
+        .eq("user_id", user.id)
+        .eq("provider", "fal")
+        .maybeSingle();
+      imageApiKey = data?.access_token ?? undefined;
+    }
+    const imageConfig: ImageConfig = { provider: imageProvider, apiKey: imageApiKey };
+    const imageUrl = await generateImage(postText, draftId, imageStyle, imageConfig);
     if (imageUrl) {
       visualAssets = [{ url: imageUrl, mime_type: "image/jpeg" }];
     }

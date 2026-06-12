@@ -29,19 +29,19 @@ export default async function DashboardLayout({
       <aside className="fixed inset-y-0 left-0 z-40 flex w-56 flex-col border-r border-white/5 bg-[rgb(15,15,18)]">
         {/* Logo */}
         <div className="flex h-14 items-center gap-2 border-b border-white/5 px-4">
-          <GitBranch className="h-5 w-5 text-brand" />
+          <GitBranch className="h-5 w-5 text-brand" suppressHydrationWarning />
           <span className="font-semibold text-white">CommitPost</span>
         </div>
 
         {/* Nav */}
         <nav className="flex flex-1 flex-col gap-1 p-3">
-          <NavLink href="/dashboard" icon={<LayoutDashboard className="h-4 w-4" />}>
+          <NavLink href="/dashboard" icon={<LayoutDashboard className="h-4 w-4" suppressHydrationWarning />}>
             Rascunhos
           </NavLink>
-          <NavLink href="/dashboard/repos" icon={<Database className="h-4 w-4" />}>
+          <NavLink href="/dashboard/repos" icon={<Database className="h-4 w-4" suppressHydrationWarning />}>
             Repositórios
           </NavLink>
-          <NavLink href="/dashboard/settings" icon={<Settings className="h-4 w-4" />}>
+          <NavLink href="/dashboard/settings" icon={<Settings className="h-4 w-4" suppressHydrationWarning />}>
             Configurações
           </NavLink>
         </nav>

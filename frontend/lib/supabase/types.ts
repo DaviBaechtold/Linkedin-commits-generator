@@ -68,6 +68,7 @@ export interface UserPreferencesRow {
   auto_post_hour: number | null;
   auto_post_grace_hours: number | null;
   auto_post_last_generated_at: string | null;
+  image_provider: string | null;
   created_at: string | null;
   updated_at: string | null;
 }

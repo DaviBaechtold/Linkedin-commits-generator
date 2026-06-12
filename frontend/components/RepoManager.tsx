@@ -30,6 +30,8 @@ export default function RepoManager({ initialRepos, githubUsername }: Props) {
   const [showGithubPicker, setShowGithubPicker] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
   const [loadingGithub, setLoadingGithub] = useState(false);
+  const [importingAll, setImportingAll] = useState(false);
+  const [importedCount, setImportedCount] = useState<number | null>(null);
 
   // Manual form state
   const [manualName, setManualName] = useState("");
@@ -47,6 +49,50 @@ export default function RepoManager({ initialRepos, githubUsername }: Props) {
       }
     } finally {
       setLoadingGithub(false);
+    }
+  }
+
+  async function importAllRepos() {
+    setImportingAll(true);
+    setImportedCount(null);
+    try {
+      const res = await fetch("/api/repos/github");
+      if (!res.ok) return;
+      const data = await res.json();
+      const all: GithubRepo[] = data.repos ?? [];
+
+      const toAdd = all.filter(
+        (gr) => !repos.some((r) => r.github_full_name === gr.full_name)
+      );
+
+      if (toAdd.length === 0) {
+        setImportedCount(0);
+        return;
+      }
+
+      const added: Repo[] = [];
+      for (let i = 0; i < toAdd.length; i++) {
+        const gr = toAdd[i];
+        const alias = `Projeto ${repos.length + added.length + 1}`;
+        const r = await fetch("/api/repos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            github_full_name: gr.full_name,
+            display_name: gr.name,
+            alias,
+          }),
+        });
+        if (r.ok) {
+          const { repo } = await r.json();
+          added.push(repo);
+        }
+      }
+
+      setRepos((prev) => [...prev, ...added]);
+      setImportedCount(added.length);
+    } finally {
+      setImportingAll(false);
     }
   }
 
@@ -150,9 +196,30 @@ export default function RepoManager({ initialRepos, githubUsername }: Props) {
       {/* GitHub picker */}
       {showGithubPicker && githubRepos.length > 0 && (
         <div className="card">
-          <p className="mb-3 text-sm font-medium text-white/70">
-            Selecione um repositório
-          </p>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-sm font-medium text-white/70">
+              Selecione um repositório
+            </p>
+            <button
+              onClick={importAllRepos}
+              disabled={importingAll}
+              className="btn-primary py-1 text-xs"
+            >
+              {importingAll ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Upload className="h-3.5 w-3.5" />
+              )}
+              {importingAll ? "Importando..." : "Importar todos"}
+            </button>
+          </div>
+          {importedCount !== null && (
+            <p className="mb-2 text-xs text-white/50">
+              {importedCount === 0
+                ? "Todos os repositórios já estão importados."
+                : `${importedCount} repositório${importedCount > 1 ? "s" : ""} importado${importedCount > 1 ? "s" : ""} com sucesso.`}
+            </p>
+          )}
           <div className="flex max-h-64 flex-col gap-1 overflow-y-auto">
             {githubRepos
               .filter(

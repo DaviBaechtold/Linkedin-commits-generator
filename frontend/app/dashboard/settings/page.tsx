@@ -31,7 +31,7 @@ export default async function SettingsPage() {
         .from("integrations")
         .select("provider,access_token")
         .eq("user_id", user.id)
-        .in("provider", ["gemini", "openai", "anthropic", "deepseek"]),
+        .in("provider", ["gemini", "openai", "anthropic", "deepseek", "fal"]),
       service
         .from("usage_logs")
         .select("id", { count: "exact", head: true })

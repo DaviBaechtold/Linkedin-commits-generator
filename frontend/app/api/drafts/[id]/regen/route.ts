@@ -2,8 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { checkRateLimit, logUsage } from "@/lib/rate-limit";
 import { generatePostText, type AIConfig } from "@/lib/ai";
-import { generateImagePollinations } from "@/lib/gemini";
+import { generateImage, type ImageConfig } from "@/lib/image";
 import { getDefaultModel, type AIProvider } from "@/lib/ai-providers";
+import type { ImageProvider } from "@/lib/image-providers";
 
 export const maxDuration = 60;
 
@@ -91,12 +92,34 @@ export async function POST(
   // Regen imagem
   const { data: prefs } = await service
     .from("user_preferences")
-    .select("image_style")
+    .select("image_style,image_provider")
     .eq("user_id", user.id)
     .maybeSingle();
 
   const imageStyle = prefs?.image_style ?? "professional";
-  const imageUrl = await generateImagePollinations(draft.post_text, id, imageStyle);
+  const imageProvider = ((prefs?.image_provider as ImageProvider) ?? "pollinations") as ImageProvider;
+
+  let imageApiKey: string | undefined;
+  if (imageProvider === "dalle") {
+    const { data } = await service
+      .from("integrations")
+      .select("access_token")
+      .eq("user_id", user.id)
+      .eq("provider", "openai")
+      .maybeSingle();
+    imageApiKey = data?.access_token ?? undefined;
+  } else if (imageProvider === "fal") {
+    const { data } = await service
+      .from("integrations")
+      .select("access_token")
+      .eq("user_id", user.id)
+      .eq("provider", "fal")
+      .maybeSingle();
+    imageApiKey = data?.access_token ?? undefined;
+  }
+
+  const imageConfig: ImageConfig = { provider: imageProvider, apiKey: imageApiKey };
+  const imageUrl = await generateImage(draft.post_text, id, imageStyle, imageConfig);
 
   const newAssets = imageUrl
     ? [{ url: imageUrl, mime_type: "image/jpeg" }]

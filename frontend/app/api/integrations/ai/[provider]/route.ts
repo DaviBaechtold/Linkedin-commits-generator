@@ -2,13 +2,16 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import type { AIProvider } from "@/lib/ai-providers";
 
-const VALID_PROVIDERS: AIProvider[] = ["gemini", "openai", "anthropic", "deepseek"];
+type AnyProvider = AIProvider | "fal";
 
-const KEY_PREFIXES: Record<AIProvider, string> = {
+const VALID_PROVIDERS: AnyProvider[] = ["gemini", "openai", "anthropic", "deepseek", "fal"];
+
+const KEY_PREFIXES: Record<AnyProvider, string> = {
   gemini: "AIza",
   anthropic: "sk-ant-",
   openai: "sk-",
   deepseek: "sk-",
+  fal: "", // Fal.ai keys have no standard prefix
 };
 
 type RouteContext = { params: Promise<{ provider: string }> };
@@ -16,7 +19,7 @@ type RouteContext = { params: Promise<{ provider: string }> };
 export async function PUT(request: NextRequest, { params }: RouteContext) {
   const { provider } = await params;
 
-  if (!VALID_PROVIDERS.includes(provider as AIProvider)) {
+  if (!VALID_PROVIDERS.includes(provider as AnyProvider)) {
     return NextResponse.json({ error: "Provider inválido." }, { status: 400 });
   }
 
@@ -32,8 +35,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   }
 
   const key = api_key.trim();
-  const prefix = KEY_PREFIXES[provider as AIProvider];
-  if (!key.startsWith(prefix)) {
+  const prefix = KEY_PREFIXES[provider as AnyProvider];
+  if (prefix && !key.startsWith(prefix)) {
     return NextResponse.json(
       { error: `Formato inválido. Chaves ${provider} começam com '${prefix}'.` },
       { status: 400 }
@@ -59,7 +62,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   const { provider } = await params;
 
-  if (!VALID_PROVIDERS.includes(provider as AIProvider)) {
+  if (!VALID_PROVIDERS.includes(provider as AnyProvider)) {
     return NextResponse.json({ error: "Provider inválido." }, { status: 400 });
   }
 

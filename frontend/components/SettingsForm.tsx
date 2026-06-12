@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { UserPreferences } from "@/lib/supabase/types";
 import { PROVIDERS, AI_PROVIDERS, getDefaultModel, type AIProvider } from "@/lib/ai-providers";
+import { IMAGE_PROVIDERS, IMAGE_PROVIDER_LIST, type ImageProvider } from "@/lib/image-providers";
 import {
   Linkedin,
   CheckCircle,
@@ -15,6 +16,7 @@ import {
   ExternalLink,
   BarChart2,
   Zap,
+  Image,
 } from "lucide-react";
 
 interface Props {
@@ -41,6 +43,7 @@ export default function SettingsForm({
     post_language: preferences?.post_language ?? "pt-BR",
     enable_images: preferences?.enable_images ?? true,
     image_style: preferences?.image_style ?? "professional",
+    image_provider: (preferences?.image_provider ?? "pollinations") as ImageProvider,
     commits_since_days: preferences?.commits_since_days ?? 30,
   });
   const [saving, setSaving] = useState(false);
@@ -92,6 +95,12 @@ export default function SettingsForm({
   });
   const [autoPostSaving, setAutoPostSaving] = useState(false);
   const [autoPostSaved, setAutoPostSaved] = useState(false);
+
+  // Fal.ai image key
+  const [falKeyInput, setFalKeyInput] = useState("");
+  const [falKeySaving, setFalKeySaving] = useState(false);
+  const [falKeyHint, setFalKeyHint] = useState<string | null>(aiKeyHints["fal"] ?? null);
+  const [falKeyError, setFalKeyError] = useState<string | null>(null);
 
   // Danger zone
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -174,6 +183,42 @@ export default function SettingsForm({
       }
     } finally {
       setKeySaving((s) => ({ ...s, [provider]: false }));
+    }
+  }
+
+  async function saveFalKey() {
+    const key = falKeyInput.trim();
+    if (!key) return;
+    setFalKeySaving(true);
+    setFalKeyError(null);
+    try {
+      const res = await fetch("/api/integrations/ai/fal", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: key }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setFalKeyError(json.error ?? "Falha ao salvar chave.");
+        return;
+      }
+      setFalKeyHint(`...${key.slice(-4)}`);
+      setFalKeyInput("");
+    } finally {
+      setFalKeySaving(false);
+    }
+  }
+
+  async function removeFalKey() {
+    setFalKeySaving(true);
+    try {
+      await fetch("/api/integrations/ai/fal", { method: "DELETE" });
+      setFalKeyHint(null);
+      if (prefs.image_provider === "fal") {
+        setPrefs((p) => ({ ...p, image_provider: "pollinations" }));
+      }
+    } finally {
+      setFalKeySaving(false);
     }
   }
 
@@ -494,7 +539,7 @@ export default function SettingsForm({
             }`}
           >
             <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+              className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
                 autoPost.auto_post_enabled ? "translate-x-5" : "translate-x-0.5"
               }`}
             />
@@ -581,6 +626,174 @@ export default function SettingsForm({
         </div>
       </section>
 
+      {/* Image generation */}
+      <section className="card flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <Image className="h-4 w-4 text-brand-light" />
+          <h2 className="text-sm font-semibold text-white/80">Geração de imagens</h2>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-white/70">Gerar imagens para os posts</p>
+            <p className="text-xs text-white/30">Cria uma ilustração visual para cada post gerado</p>
+          </div>
+          <button
+            onClick={() => setPrefs((p) => ({ ...p, enable_images: !p.enable_images }))}
+            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+              prefs.enable_images ? "bg-brand" : "bg-white/10"
+            }`}
+          >
+            <span
+              className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                prefs.enable_images ? "translate-x-5" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+
+        {prefs.enable_images && (
+          <>
+            <div>
+              <label className="label">Provedor de imagem</label>
+              <div className="flex flex-col gap-2">
+                {IMAGE_PROVIDER_LIST.map((p) => {
+                  const info = IMAGE_PROVIDERS[p];
+                  const isSelected = prefs.image_provider === p;
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => setPrefs((prev) => ({ ...prev, image_provider: p }))}
+                      className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
+                        isSelected
+                          ? "border-brand/50 bg-brand/10"
+                          : "border-white/5 bg-white/[0.02] hover:border-white/15"
+                      }`}
+                    >
+                      <div
+                        className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 transition-colors ${
+                          isSelected ? "border-brand bg-brand" : "border-white/20"
+                        }`}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-white/80">{info.label}</p>
+                        <p className="text-xs text-white/35">{info.description}</p>
+                      </div>
+                      {p === "pollinations" && (
+                        <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-xs text-green-400">
+                          Gratuito
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* DALL-E status (uses OpenAI key) */}
+            {prefs.image_provider === "dalle" && (
+              <div
+                className={`rounded-lg border px-3 py-2 text-xs ${
+                  keyHints["openai"]
+                    ? "border-green-500/20 bg-green-500/5 text-green-400"
+                    : "border-yellow-500/20 bg-yellow-500/5 text-yellow-300/80"
+                }`}
+              >
+                {keyHints["openai"] ? (
+                  <>✓ Usando chave OpenAI ({keyHints["openai"]})</>
+                ) : (
+                  <>⚠ Configure sua chave OpenAI na aba &quot;OpenAI&quot; acima para usar o DALL-E 3.</>
+                )}
+              </div>
+            )}
+
+            {/* Fal.ai key management */}
+            {prefs.image_provider === "fal" && (
+              <div className="flex flex-col gap-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
+                <p className="text-xs font-medium text-white/60">Chave da API Fal.ai</p>
+                {falKeyHint ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-400" />
+                      <div>
+                        <p className="text-sm text-white/80">Conectado</p>
+                        <p className="font-mono text-xs text-white/30">{falKeyHint}</p>
+                      </div>
+                    </div>
+                    <button onClick={removeFalKey} disabled={falKeySaving} className="btn-ghost">
+                      {falKeySaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      Remover
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {falKeyError && (
+                      <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                        {falKeyError}
+                      </p>
+                    )}
+                    <input
+                      type="password"
+                      className="input"
+                      value={falKeyInput}
+                      onChange={(e) => setFalKeyInput(e.target.value)}
+                      placeholder="xxxxxxxxxxxxxxxx:..."
+                      autoComplete="off"
+                      onKeyDown={(e) => e.key === "Enter" && saveFalKey()}
+                    />
+                    <div className="flex items-center justify-between">
+                      <a
+                        href="https://fal.ai/dashboard/keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-0.5 text-xs text-brand-light hover:underline"
+                      >
+                        Obter chave em fal.ai
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                      <button
+                        onClick={saveFalKey}
+                        disabled={falKeySaving || !falKeyInput.trim()}
+                        className="btn-primary"
+                      >
+                        {falKeySaving ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Key className="h-4 w-4" />
+                        )}
+                        Salvar
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div>
+              <label className="label">Estilo visual</label>
+              <select
+                className="input"
+                value={prefs.image_style}
+                onChange={(e) => setPrefs((p) => ({ ...p, image_style: e.target.value }))}
+              >
+                <option value="professional">Profissional</option>
+                <option value="tech">Tech / Dark</option>
+                <option value="minimal">Minimalista</option>
+                <option value="colorful">Colorido</option>
+              </select>
+            </div>
+          </>
+        )}
+
+        <div className="flex items-center gap-3 pt-1">
+          <button onClick={savePreferences} disabled={saving} className="btn-primary">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Salvar
+          </button>
+          {saved && <span className="text-sm text-green-400">Salvo!</span>}
+        </div>
+      </section>
+
       {/* General preferences */}
       <section className="card flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-white/80">Preferências de geração</h2>
@@ -614,41 +827,6 @@ export default function SettingsForm({
             }
           />
         </div>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-white/70">Gerar imagens</p>
-            <p className="text-xs text-white/30">Cria uma imagem visual via Pollinations.ai</p>
-          </div>
-          <button
-            onClick={() => setPrefs((p) => ({ ...p, enable_images: !p.enable_images }))}
-            className={`relative h-6 w-11 rounded-full transition-colors ${
-              prefs.enable_images ? "bg-brand" : "bg-white/10"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                prefs.enable_images ? "translate-x-5" : "translate-x-0.5"
-              }`}
-            />
-          </button>
-        </div>
-
-        {prefs.enable_images && (
-          <div>
-            <label className="label">Estilo visual</label>
-            <select
-              className="input"
-              value={prefs.image_style}
-              onChange={(e) => setPrefs((p) => ({ ...p, image_style: e.target.value }))}
-            >
-              <option value="professional">Profissional</option>
-              <option value="tech">Tech / Dark</option>
-              <option value="minimal">Minimalista</option>
-              <option value="colorful">Colorido</option>
-            </select>
-          </div>
-        )}
 
         <div className="flex items-center gap-3 pt-2">
           <button onClick={savePreferences} disabled={saving} className="btn-primary">

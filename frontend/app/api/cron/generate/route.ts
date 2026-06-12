@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { generatePostText, type AIConfig } from "@/lib/ai";
-import { generateImagePollinations } from "@/lib/gemini";
+import { generateImage, type ImageConfig } from "@/lib/image";
 import { getDefaultModel, type AIProvider } from "@/lib/ai-providers";
+import type { ImageProvider } from "@/lib/image-providers";
 import { fetchCommits, formatCommitsForPrompt, type GitHubCommit } from "@/lib/github";
 
 export const maxDuration = 60;
@@ -58,6 +59,7 @@ export async function GET(request: NextRequest) {
       sinceDate.setDate(sinceDate.getDate() - ((pref.commits_since_days as number) ?? 30));
       const enableImages = (pref.enable_images as boolean) ?? true;
       const imageStyle = (pref.image_style as string) ?? "professional";
+      const imageProvider = ((pref.image_provider as ImageProvider) ?? "pollinations") as ImageProvider;
 
       const [aiIntegration, ghIntegration, reposResult, linkedinInt] = await Promise.all([
         service
@@ -113,7 +115,26 @@ export async function GET(request: NextRequest) {
       const draftId = Date.now().toString();
       let visualAssets: { url: string; mime_type: string }[] = [];
       if (enableImages) {
-        const imageUrl = await generateImagePollinations(postText, draftId, imageStyle);
+        let imageApiKey: string | undefined;
+        if (imageProvider === "dalle") {
+          const { data } = await service
+            .from("integrations")
+            .select("access_token")
+            .eq("user_id", userId)
+            .eq("provider", "openai")
+            .maybeSingle();
+          imageApiKey = data?.access_token ?? undefined;
+        } else if (imageProvider === "fal") {
+          const { data } = await service
+            .from("integrations")
+            .select("access_token")
+            .eq("user_id", userId)
+            .eq("provider", "fal")
+            .maybeSingle();
+          imageApiKey = data?.access_token ?? undefined;
+        }
+        const imageConfig: ImageConfig = { provider: imageProvider, apiKey: imageApiKey };
+        const imageUrl = await generateImage(postText, draftId, imageStyle, imageConfig);
         if (imageUrl) visualAssets = [{ url: imageUrl, mime_type: "image/jpeg" }];
       }
 

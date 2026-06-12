@@ -165,6 +165,7 @@ export type Database = {
           created_at: string | null
           daily_limit: number | null
           enable_images: boolean | null
+          image_provider: string | null
           image_style: string | null
           post_language: string | null
           profile_instructions: string | null
@@ -183,6 +184,7 @@ export type Database = {
           created_at?: string | null
           daily_limit?: number | null
           enable_images?: boolean | null
+          image_provider?: string | null
           image_style?: string | null
           post_language?: string | null
           profile_instructions?: string | null
@@ -201,6 +203,7 @@ export type Database = {
           created_at?: string | null
           daily_limit?: number | null
           enable_images?: boolean | null
+          image_provider?: string | null
           image_style?: string | null
           post_language?: string | null
           profile_instructions?: string | null

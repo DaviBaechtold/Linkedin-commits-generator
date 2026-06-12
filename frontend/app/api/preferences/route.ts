@@ -12,11 +12,13 @@ export async function PUT(request: NextRequest) {
   const body = await request.json();
 
   const VALID_PROVIDERS = ["gemini", "openai", "anthropic", "deepseek"];
+  const VALID_IMAGE_PROVIDERS = ["pollinations", "dalle", "fal"];
 
   const allowed = [
     "post_language",
     "enable_images",
     "image_style",
+    "image_provider",
     "commits_since_days",
     "ai_provider",
     "ai_model",
@@ -52,6 +54,10 @@ export async function PUT(request: NextRequest) {
 
   if (update.ai_provider && !VALID_PROVIDERS.includes(update.ai_provider as string)) {
     return NextResponse.json({ error: "Provider de IA inválido." }, { status: 400 });
+  }
+
+  if (update.image_provider && !VALID_IMAGE_PROVIDERS.includes(update.image_provider as string)) {
+    return NextResponse.json({ error: "Provider de imagem inválido." }, { status: 400 });
   }
 
   if (update.profile_instructions !== undefined) {
