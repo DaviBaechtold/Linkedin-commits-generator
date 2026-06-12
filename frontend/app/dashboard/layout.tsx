@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { GitBranch, LayoutDashboard, Database, Settings, LogOut } from "lucide-react";
 import LogoutButton from "@/components/LogoutButton";
+import OnboardingTour from "@/components/OnboardingTour";
 
 export default async function DashboardLayout({
   children,
@@ -25,6 +26,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen">
+      <OnboardingTour />
       {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 flex w-56 flex-col border-r border-white/5 bg-[rgb(15,15,18)]">
         {/* Logo */}

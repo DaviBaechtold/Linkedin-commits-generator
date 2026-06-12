@@ -167,7 +167,7 @@ export default function RepoManager({ initialRepos, githubUsername }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" data-tutorial="repos">
       {/* Actions */}
       <div className="flex flex-wrap gap-2">
         {githubUsername && (

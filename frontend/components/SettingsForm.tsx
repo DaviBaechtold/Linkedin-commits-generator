@@ -261,7 +261,7 @@ export default function SettingsForm({
   return (
     <div className="flex flex-col gap-6">
       {/* LinkedIn */}
-      <section className="card">
+      <section className="card" data-tutorial="linkedin">
         <h2 className="mb-4 text-sm font-semibold text-white/80">Integração LinkedIn</h2>
         {linkedinConnected && !linkedinExpired ? (
           <div className="flex items-center justify-between">
@@ -304,7 +304,7 @@ export default function SettingsForm({
       </section>
 
       {/* AI Keys */}
-      <section className="card flex flex-col gap-4">
+      <section className="card flex flex-col gap-4" data-tutorial="ai-key">
         <div className="flex items-center gap-2">
           <Key className="h-4 w-4 text-brand-light" />
           <h2 className="text-sm font-semibold text-white/80">Chaves de API</h2>
@@ -627,7 +627,7 @@ export default function SettingsForm({
       </section>
 
       {/* Image generation */}
-      <section className="card flex flex-col gap-4">
+      <section className="card flex flex-col gap-4" data-tutorial="image-provider">
         <div className="flex items-center gap-2">
           <Image className="h-4 w-4 text-brand-light" />
           <h2 className="text-sm font-semibold text-white/80">Geração de imagens</h2>
