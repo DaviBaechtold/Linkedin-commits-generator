@@ -148,32 +148,41 @@ export type Database = {
       }
       user_preferences: {
         Row: {
+          ai_model: string | null
+          ai_provider: string | null
           commits_since_days: number | null
           created_at: string | null
           daily_limit: number | null
           enable_images: boolean | null
           image_style: string | null
           post_language: string | null
+          profile_instructions: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          ai_model?: string | null
+          ai_provider?: string | null
           commits_since_days?: number | null
           created_at?: string | null
           daily_limit?: number | null
           enable_images?: boolean | null
           image_style?: string | null
           post_language?: string | null
+          profile_instructions?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          ai_model?: string | null
+          ai_provider?: string | null
           commits_since_days?: number | null
           created_at?: string | null
           daily_limit?: number | null
           enable_images?: boolean | null
           image_style?: string | null
           post_language?: string | null
+          profile_instructions?: string | null
           updated_at?: string | null
           user_id?: string
         }

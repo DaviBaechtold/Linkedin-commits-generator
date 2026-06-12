@@ -7,17 +7,17 @@ import { Sparkles, Loader2 } from "lucide-react";
 interface Props {
   hasLinkedIn: boolean;
   hasRepos: boolean;
-  hasGemini: boolean;
+  hasAI: boolean;
 }
 
-export default function GenerateButton({ hasLinkedIn, hasRepos, hasGemini }: Props) {
+export default function GenerateButton({ hasLinkedIn, hasRepos, hasAI }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const canGenerate = hasRepos && hasGemini;
-  const disabledReason = !hasGemini
-    ? "Configure sua Gemini API Key em Configurações"
+  const canGenerate = hasRepos && hasAI;
+  const disabledReason = !hasAI
+    ? "Configure uma chave de API de IA em Configurações"
     : !hasRepos
     ? "Adicione repositórios primeiro"
     : undefined;

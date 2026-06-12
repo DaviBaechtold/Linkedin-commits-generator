@@ -18,3 +18,5 @@ frontend/out/
 
 # Supabase temp
 supabase/.temp/
+
+.venv

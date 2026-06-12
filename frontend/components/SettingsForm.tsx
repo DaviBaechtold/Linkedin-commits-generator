@@ -3,15 +3,26 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { UserPreferences } from "@/lib/supabase/types";
-import { Linkedin, CheckCircle, AlertCircle, Loader2, Save, Trash2, Key, ExternalLink } from "lucide-react";
+import { PROVIDERS, AI_PROVIDERS, getDefaultModel, type AIProvider } from "@/lib/ai-providers";
+import {
+  Linkedin,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  Save,
+  Trash2,
+  Key,
+  ExternalLink,
+  BarChart2,
+} from "lucide-react";
 
 interface Props {
   preferences: UserPreferences | null;
   linkedinConnected: boolean;
   linkedinExpiry: string | null;
   linkedinUsername: string | null;
-  geminiConnected: boolean;
-  geminiKeyHint: string | null;
+  aiKeyHints: Record<string, string | null>;
+  usageStats: { today: number; week: number; month: number };
 }
 
 export default function SettingsForm({
@@ -19,10 +30,12 @@ export default function SettingsForm({
   linkedinConnected,
   linkedinExpiry,
   linkedinUsername,
-  geminiConnected,
-  geminiKeyHint,
+  aiKeyHints,
+  usageStats,
 }: Props) {
   const router = useRouter();
+
+  // General preferences
   const [prefs, setPrefs] = useState({
     post_language: preferences?.post_language ?? "pt-BR",
     enable_images: preferences?.enable_images ?? true,
@@ -31,17 +44,50 @@ export default function SettingsForm({
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [geminiKey, setGeminiKey] = useState("");
-  const [geminiSaving, setGeminiSaving] = useState(false);
-  const [geminiSaved, setGeminiSaved] = useState(geminiConnected);
-  const [geminiHint, setGeminiHint] = useState(geminiKeyHint);
-  const [geminiError, setGeminiError] = useState<string | null>(null);
+
+  // AI preferences
+  const initialProvider = (preferences?.ai_provider as AIProvider) ?? "gemini";
+  const [aiPrefs, setAiPrefs] = useState({
+    ai_provider: initialProvider,
+    ai_model: (preferences?.ai_model as string) ?? getDefaultModel(initialProvider),
+    profile_instructions: preferences?.profile_instructions ?? "",
+  });
+  const [aiPrefsSaving, setAiPrefsSaving] = useState(false);
+  const [aiPrefsSaved, setAiPrefsSaved] = useState(false);
+
+  // Per-provider key management
+  const [activeTab, setActiveTab] = useState<AIProvider>(initialProvider);
+  const [keyInputs, setKeyInputs] = useState<Record<AIProvider, string>>({
+    gemini: "",
+    anthropic: "",
+    openai: "",
+    deepseek: "",
+  });
+  const [keySaving, setKeySaving] = useState<Record<AIProvider, boolean>>({
+    gemini: false,
+    anthropic: false,
+    openai: false,
+    deepseek: false,
+  });
+  const [keyHints, setKeyHints] = useState<Record<AIProvider, string | null>>({
+    gemini: aiKeyHints["gemini"] ?? null,
+    anthropic: aiKeyHints["anthropic"] ?? null,
+    openai: aiKeyHints["openai"] ?? null,
+    deepseek: aiKeyHints["deepseek"] ?? null,
+  });
+  const [keyErrors, setKeyErrors] = useState<Record<AIProvider, string | null>>({
+    gemini: null,
+    anthropic: null,
+    openai: null,
+    deepseek: null,
+  });
+
+  // Danger zone
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const linkedinExpired =
-    linkedinExpiry && new Date(linkedinExpiry) < new Date();
+  const linkedinExpired = linkedinExpiry && new Date(linkedinExpiry) < new Date();
 
   async function savePreferences() {
     setSaving(true);
@@ -58,41 +104,65 @@ export default function SettingsForm({
     }
   }
 
+  async function saveAiPrefs() {
+    setAiPrefsSaving(true);
+    setAiPrefsSaved(false);
+    try {
+      const res = await fetch("/api/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(aiPrefs),
+      });
+      if (res.ok) setAiPrefsSaved(true);
+    } finally {
+      setAiPrefsSaving(false);
+    }
+  }
+
   function connectLinkedIn() {
     window.location.href = "/api/auth/linkedin";
   }
 
-  async function saveGeminiKey() {
-    setGeminiSaving(true);
-    setGeminiError(null);
+  async function saveKey(provider: AIProvider) {
+    const key = keyInputs[provider].trim();
+    if (!key) return;
+
+    setKeySaving((s) => ({ ...s, [provider]: true }));
+    setKeyErrors((e) => ({ ...e, [provider]: null }));
+
     try {
-      const res = await fetch("/api/integrations/gemini", {
+      const res = await fetch(`/api/integrations/ai/${provider}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: geminiKey }),
+        body: JSON.stringify({ api_key: key }),
       });
       const json = await res.json();
       if (!res.ok) {
-        setGeminiError(json.error ?? "Falha ao salvar chave.");
+        setKeyErrors((e) => ({ ...e, [provider]: json.error ?? "Falha ao salvar chave." }));
         return;
       }
-      setGeminiSaved(true);
-      setGeminiHint(`...${geminiKey.trim().slice(-4)}`);
-      setGeminiKey("");
+      setKeyHints((h) => ({ ...h, [provider]: `...${key.slice(-4)}` }));
+      setKeyInputs((i) => ({ ...i, [provider]: "" }));
     } finally {
-      setGeminiSaving(false);
+      setKeySaving((s) => ({ ...s, [provider]: false }));
     }
   }
 
-  async function removeGeminiKey() {
-    setGeminiSaving(true);
-    setGeminiError(null);
+  async function removeKey(provider: AIProvider) {
+    setKeySaving((s) => ({ ...s, [provider]: true }));
     try {
-      await fetch("/api/integrations/gemini", { method: "DELETE" });
-      setGeminiSaved(false);
-      setGeminiHint(null);
+      await fetch(`/api/integrations/ai/${provider}`, { method: "DELETE" });
+      setKeyHints((h) => ({ ...h, [provider]: null }));
+      // If active provider key was removed, reset to gemini
+      if (aiPrefs.ai_provider === provider) {
+        setAiPrefs((p) => ({
+          ...p,
+          ai_provider: "gemini",
+          ai_model: getDefaultModel("gemini"),
+        }));
+      }
     } finally {
-      setGeminiSaving(false);
+      setKeySaving((s) => ({ ...s, [provider]: false }));
     }
   }
 
@@ -114,13 +184,14 @@ export default function SettingsForm({
     }
   }
 
+  const connectedProviders = AI_PROVIDERS.filter((p) => !!keyHints[p]);
+  const activeProviderInfo = PROVIDERS[aiPrefs.ai_provider as AIProvider];
+
   return (
     <div className="flex flex-col gap-6">
       {/* LinkedIn */}
       <section className="card">
-        <h2 className="mb-4 text-sm font-semibold text-white/80">
-          Integração LinkedIn
-        </h2>
+        <h2 className="mb-4 text-sm font-semibold text-white/80">Integração LinkedIn</h2>
         {linkedinConnected && !linkedinExpired ? (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -132,8 +203,7 @@ export default function SettingsForm({
                 )}
                 {linkedinExpiry && (
                   <p className="text-xs text-white/25">
-                    Expira em{" "}
-                    {new Date(linkedinExpiry).toLocaleDateString("pt-BR")}
+                    Expira em {new Date(linkedinExpiry).toLocaleDateString("pt-BR")}
                   </p>
                 )}
               </div>
@@ -153,10 +223,7 @@ export default function SettingsForm({
                   ? "Token expirado — reconecte para continuar publicando."
                   : "Conecte seu LinkedIn para publicar posts diretamente."}
               </p>
-              <button
-                onClick={connectLinkedIn}
-                className="btn-primary mt-3"
-              >
+              <button onClick={connectLinkedIn} className="btn-primary mt-3">
                 <Linkedin className="h-4 w-4" />
                 Conectar LinkedIn
               </button>
@@ -165,90 +232,228 @@ export default function SettingsForm({
         )}
       </section>
 
-      {/* Gemini API Key */}
-      <section className="card flex flex-col gap-3">
+      {/* AI Keys */}
+      <section className="card flex flex-col gap-4">
         <div className="flex items-center gap-2">
           <Key className="h-4 w-4 text-brand-light" />
-          <h2 className="text-sm font-semibold text-white/80">Gemini API Key</h2>
+          <h2 className="text-sm font-semibold text-white/80">Chaves de API</h2>
+        </div>
+        <p className="text-xs text-white/40">
+          O CommitPost usa sua própria chave — você controla o uso e os custos.
+        </p>
+
+        {/* Provider tabs */}
+        <div className="flex gap-1 rounded-lg bg-white/5 p-1">
+          {AI_PROVIDERS.map((p) => (
+            <button
+              key={p}
+              onClick={() => setActiveTab(p)}
+              className={`relative flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                activeTab === p
+                  ? "bg-white/10 text-white"
+                  : "text-white/40 hover:text-white/60"
+              }`}
+            >
+              {PROVIDERS[p].label.split(" ")[0]}
+              {keyHints[p] && (
+                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-green-400" />
+              )}
+            </button>
+          ))}
         </div>
 
-        {geminiSaved ? (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-400" />
-              <div>
-                <p className="text-sm text-white/80">Conectado</p>
-                {geminiHint && (
-                  <p className="text-xs text-white/30 font-mono">{geminiHint}</p>
-                )}
-              </div>
-            </div>
-            <button
-              onClick={removeGeminiKey}
-              disabled={geminiSaving}
-              className="btn-ghost"
-            >
-              {geminiSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              Remover
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <p className="text-xs text-white/40">
-              O CommitPost usa sua própria chave Gemini — você controla o uso e a quota.{" "}
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-0.5 text-brand-light hover:underline"
-              >
-                Obter chave no AI Studio
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </p>
-            {geminiError && (
-              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
-                {geminiError}
-              </p>
-            )}
-            <input
-              type="password"
-              className="input"
-              value={geminiKey}
-              onChange={(e) => setGeminiKey(e.target.value)}
-              placeholder="AIzaSy..."
-              autoComplete="off"
-            />
-            <button
-              onClick={saveGeminiKey}
-              disabled={geminiSaving || !geminiKey.trim()}
-              className="btn-primary self-start"
-            >
-              {geminiSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+        {/* Active tab content */}
+        {AI_PROVIDERS.map((p) =>
+          activeTab !== p ? null : (
+            <div key={p} className="flex flex-col gap-3">
+              {keyHints[p] ? (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-400" />
+                    <div>
+                      <p className="text-sm text-white/80">Conectado</p>
+                      <p className="font-mono text-xs text-white/30">{keyHints[p]}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => removeKey(p)}
+                    disabled={keySaving[p]}
+                    className="btn-ghost"
+                  >
+                    {keySaving[p] ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : null}
+                    Remover
+                  </button>
+                </div>
               ) : (
-                <Key className="h-4 w-4" />
+                <div className="flex flex-col gap-3">
+                  {keyErrors[p] && (
+                    <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                      {keyErrors[p]}
+                    </p>
+                  )}
+                  <input
+                    type="password"
+                    className="input"
+                    value={keyInputs[p]}
+                    onChange={(e) =>
+                      setKeyInputs((i) => ({ ...i, [p]: e.target.value }))
+                    }
+                    placeholder={PROVIDERS[p].keyPlaceholder}
+                    autoComplete="off"
+                    onKeyDown={(e) => e.key === "Enter" && saveKey(p)}
+                  />
+                  <div className="flex items-center justify-between">
+                    <a
+                      href={PROVIDERS[p].keyLinkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-0.5 text-xs text-brand-light hover:underline"
+                    >
+                      {PROVIDERS[p].keyLinkLabel}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                    <button
+                      onClick={() => saveKey(p)}
+                      disabled={keySaving[p] || !keyInputs[p].trim()}
+                      className="btn-primary"
+                    >
+                      {keySaving[p] ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Key className="h-4 w-4" />
+                      )}
+                      Salvar
+                    </button>
+                  </div>
+                </div>
               )}
-              Salvar chave
-            </button>
-          </div>
+            </div>
+          )
         )}
       </section>
 
-      {/* Preferences */}
+      {/* AI config: active provider + model + profile instructions */}
       <section className="card flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-white/80">
-          Preferências de geração
-        </h2>
+        <h2 className="text-sm font-semibold text-white/80">Configuração de IA</h2>
+
+        <div>
+          <label className="label">Provedor ativo</label>
+          <select
+            className="input"
+            value={aiPrefs.ai_provider}
+            onChange={(e) => {
+              const prov = e.target.value as AIProvider;
+              setAiPrefs((a) => ({
+                ...a,
+                ai_provider: prov,
+                ai_model: getDefaultModel(prov),
+              }));
+            }}
+          >
+            {AI_PROVIDERS.map((p) => (
+              <option key={p} value={p} disabled={!keyHints[p]}>
+                {PROVIDERS[p].label}
+                {!keyHints[p] ? " (sem chave)" : ""}
+              </option>
+            ))}
+          </select>
+          {!keyHints[aiPrefs.ai_provider as AIProvider] && (
+            <p className="mt-1 text-xs text-yellow-400/70">
+              Adicione a chave de API deste provedor acima para usá-lo.
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className="label">Modelo</label>
+          <select
+            className="input"
+            value={aiPrefs.ai_model}
+            onChange={(e) => setAiPrefs((a) => ({ ...a, ai_model: e.target.value }))}
+          >
+            {activeProviderInfo.models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="label">Instruções de perfil</label>
+          <p className="mb-1.5 text-xs text-white/35">
+            Descreva seu perfil profissional para personalizar o tom e o estilo dos posts.
+          </p>
+          <textarea
+            className="input min-h-[100px] resize-y"
+            value={aiPrefs.profile_instructions}
+            onChange={(e) =>
+              setAiPrefs((a) => ({ ...a, profile_instructions: e.target.value }))
+            }
+            placeholder="Ex: Sou desenvolvedor full-stack com 5 anos de experiência em React e Node.js. Escrevo de forma técnica mas acessível, com foco em aprendizados práticos."
+            maxLength={1000}
+          />
+          <p className="mt-1 text-right text-xs text-white/20">
+            {aiPrefs.profile_instructions.length}/1000
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button onClick={saveAiPrefs} disabled={aiPrefsSaving} className="btn-primary">
+            {aiPrefsSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Salvar
+          </button>
+          {aiPrefsSaved && <span className="text-sm text-green-400">Salvo!</span>}
+        </div>
+      </section>
+
+      {/* Usage stats */}
+      <section className="card flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <BarChart2 className="h-4 w-4 text-brand-light" />
+          <h2 className="text-sm font-semibold text-white/80">Consumo de API</h2>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-lg bg-white/5 p-3 text-center">
+            <p className="text-2xl font-semibold text-white">{usageStats.today}</p>
+            <p className="mt-0.5 text-xs text-white/35">Hoje</p>
+          </div>
+          <div className="rounded-lg bg-white/5 p-3 text-center">
+            <p className="text-2xl font-semibold text-white">{usageStats.week}</p>
+            <p className="mt-0.5 text-xs text-white/35">Últimos 7 dias</p>
+          </div>
+          <div className="rounded-lg bg-white/5 p-3 text-center">
+            <p className="text-2xl font-semibold text-white">{usageStats.month}</p>
+            <p className="mt-0.5 text-xs text-white/35">Este mês</p>
+          </div>
+        </div>
+        <p className="text-xs text-white/25">Posts gerados via IA. Cada geração usa uma chamada à API do provedor.</p>
+        {connectedProviders.length > 0 && (
+          <p className="text-xs text-white/35">
+            Provedor ativo:{" "}
+            <span className="text-white/60">{PROVIDERS[aiPrefs.ai_provider as AIProvider]?.label}</span>
+            {" · "}
+            <span className="font-mono text-white/40">{aiPrefs.ai_model}</span>
+          </p>
+        )}
+      </section>
+
+      {/* General preferences */}
+      <section className="card flex flex-col gap-4">
+        <h2 className="text-sm font-semibold text-white/80">Preferências de geração</h2>
 
         <div>
           <label className="label">Idioma dos posts</label>
           <select
             className="input"
             value={prefs.post_language}
-            onChange={(e) =>
-              setPrefs((p) => ({ ...p, post_language: e.target.value }))
-            }
+            onChange={(e) => setPrefs((p) => ({ ...p, post_language: e.target.value }))}
           >
             <option value="pt-BR">Português (Brasil)</option>
             <option value="en-US">English (US)</option>
@@ -276,14 +481,10 @@ export default function SettingsForm({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-white/70">Gerar imagens</p>
-            <p className="text-xs text-white/30">
-              Cria uma imagem visual via Pollinations.ai
-            </p>
+            <p className="text-xs text-white/30">Cria uma imagem visual via Pollinations.ai</p>
           </div>
           <button
-            onClick={() =>
-              setPrefs((p) => ({ ...p, enable_images: !p.enable_images }))
-            }
+            onClick={() => setPrefs((p) => ({ ...p, enable_images: !p.enable_images }))}
             className={`relative h-6 w-11 rounded-full transition-colors ${
               prefs.enable_images ? "bg-brand" : "bg-white/10"
             }`}
@@ -302,9 +503,7 @@ export default function SettingsForm({
             <select
               className="input"
               value={prefs.image_style}
-              onChange={(e) =>
-                setPrefs((p) => ({ ...p, image_style: e.target.value }))
-              }
+              onChange={(e) => setPrefs((p) => ({ ...p, image_style: e.target.value }))}
             >
               <option value="professional">Profissional</option>
               <option value="tech">Tech / Dark</option>
@@ -315,32 +514,20 @@ export default function SettingsForm({
         )}
 
         <div className="flex items-center gap-3 pt-2">
-          <button
-            onClick={savePreferences}
-            disabled={saving}
-            className="btn-primary"
-          >
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
+          <button onClick={savePreferences} disabled={saving} className="btn-primary">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Salvar
           </button>
-          {saved && (
-            <span className="text-sm text-green-400">Salvo!</span>
-          )}
+          {saved && <span className="text-sm text-green-400">Salvo!</span>}
         </div>
       </section>
-      {/* Zona de perigo */}
+
+      {/* Danger zone */}
       <section className="card border-red-500/20">
-        <h2 className="mb-1 text-sm font-semibold text-red-400">
-          Zona de perigo
-        </h2>
+        <h2 className="mb-1 text-sm font-semibold text-red-400">Zona de perigo</h2>
         <p className="mb-4 text-xs text-white/40">
-          A exclusão de conta é permanente e irreversível. Todos os seus
-          rascunhos, repositórios e integrações serão deletados imediatamente,
-          conforme a LGPD.
+          A exclusão de conta é permanente e irreversível. Todos os seus rascunhos,
+          repositórios e integrações serão deletados imediatamente, conforme a LGPD.
         </p>
 
         {deleteError && (
@@ -365,11 +552,7 @@ export default function SettingsForm({
           disabled={deleteConfirm !== "EXCLUIR" || deleting}
           className="btn-danger-outline"
         >
-          {deleting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Trash2 className="h-4 w-4" />
-          )}
+          {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
           Excluir minha conta
         </button>
       </section>

@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { checkRateLimit, logUsage } from "@/lib/rate-limit";
-import { regeneratePostText, generateImagePollinations } from "@/lib/gemini";
+import { generatePostText, type AIConfig } from "@/lib/ai";
+import { generateImagePollinations } from "@/lib/gemini";
+import { getDefaultModel, type AIProvider } from "@/lib/ai-providers";
 
 export const maxDuration = 60;
 
@@ -23,28 +25,10 @@ export async function POST(
   const action = type === "text" ? "regen_text" : "regen_image";
   const { allowed } = await checkRateLimit(user.id, action);
   if (!allowed) {
-    return NextResponse.json(
-      { error: "Limite de regenerações atingido." },
-      { status: 429 }
-    );
+    return NextResponse.json({ error: "Limite de regenerações atingido." }, { status: 429 });
   }
 
   const service = createServiceClient();
-
-  const { data: geminiData } = await service
-    .from("integrations")
-    .select("access_token")
-    .eq("user_id", user.id)
-    .eq("provider", "gemini")
-    .maybeSingle();
-
-  const geminiApiKey = geminiData?.access_token;
-  if (!geminiApiKey) {
-    return NextResponse.json(
-      { error: "Chave Gemini não configurada. Adicione sua API Key em Configurações." },
-      { status: 400 }
-    );
-  }
 
   const { data: draft, error: fetchError } = await service
     .from("drafts")
@@ -60,15 +44,37 @@ export async function POST(
   if (type === "text") {
     const { data: prefs } = await service
       .from("user_preferences")
-      .select("post_language")
+      .select("post_language,ai_provider,ai_model,profile_instructions")
       .eq("user_id", user.id)
       .maybeSingle();
 
+    const aiProvider = ((prefs?.ai_provider as AIProvider) ?? "gemini") as AIProvider;
+    const aiModel = (prefs?.ai_model as string) ?? getDefaultModel(aiProvider);
+    const profileInstructions = (prefs?.profile_instructions as string | undefined) ?? undefined;
     const language = prefs?.post_language ?? "pt-BR";
-    const newText = await regeneratePostText(
+
+    const { data: aiIntegration } = await service
+      .from("integrations")
+      .select("access_token")
+      .eq("user_id", user.id)
+      .eq("provider", aiProvider)
+      .maybeSingle();
+
+    const aiApiKey = aiIntegration?.access_token;
+    if (!aiApiKey) {
+      return NextResponse.json(
+        { error: `Chave de API ${aiProvider} não configurada.` },
+        { status: 400 }
+      );
+    }
+
+    const aiConfig: AIConfig = { provider: aiProvider, model: aiModel, apiKey: aiApiKey };
+
+    const newText = await generatePostText(
       draft.raw_log_summary ?? draft.post_text,
       language,
-      geminiApiKey
+      aiConfig,
+      profileInstructions
     );
 
     const { data: updated } = await service
@@ -90,11 +96,7 @@ export async function POST(
     .maybeSingle();
 
   const imageStyle = prefs?.image_style ?? "professional";
-  const imageUrl = await generateImagePollinations(
-    draft.post_text,
-    id,
-    imageStyle
-  );
+  const imageUrl = await generateImagePollinations(draft.post_text, id, imageStyle);
 
   const newAssets = imageUrl
     ? [{ url: imageUrl, mime_type: "image/jpeg" }]

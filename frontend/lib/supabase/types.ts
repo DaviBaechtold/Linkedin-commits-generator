@@ -53,13 +53,16 @@ export interface UsageLogRow {
 
 export interface UserPreferencesRow {
   user_id: string;
-  post_language: string;
-  enable_images: boolean;
-  image_style: string;
-  commits_since_days: number;
-  daily_limit: number;
-  created_at: string;
-  updated_at: string;
+  post_language: string | null;
+  enable_images: boolean | null;
+  image_style: string | null;
+  commits_since_days: number | null;
+  daily_limit: number | null;
+  ai_provider: string | null;
+  ai_model: string | null;
+  profile_instructions: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 // ---- Database schema ----

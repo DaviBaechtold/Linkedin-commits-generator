@@ -11,11 +11,16 @@ export async function PUT(request: NextRequest) {
 
   const body = await request.json();
 
+  const VALID_PROVIDERS = ["gemini", "openai", "anthropic", "deepseek"];
+
   const allowed = [
     "post_language",
     "enable_images",
     "image_style",
     "commits_since_days",
+    "ai_provider",
+    "ai_model",
+    "profile_instructions",
   ] as const;
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
@@ -39,6 +44,19 @@ export async function PUT(request: NextRequest) {
       );
     }
     update.commits_since_days = days;
+  }
+
+  if (update.ai_provider && !VALID_PROVIDERS.includes(update.ai_provider as string)) {
+    return NextResponse.json({ error: "Provider de IA inválido." }, { status: 400 });
+  }
+
+  if (update.profile_instructions !== undefined) {
+    if (typeof update.profile_instructions !== "string") {
+      return NextResponse.json({ error: "profile_instructions inválido." }, { status: 400 });
+    }
+    if ((update.profile_instructions as string).length > 1000) {
+      return NextResponse.json({ error: "Instruções de perfil muito longas (máx. 1000 chars)." }, { status: 400 });
+    }
   }
 
   const service = createServiceClient();

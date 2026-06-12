@@ -1,24 +1,56 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import SettingsForm from "@/components/SettingsForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const [prefsResult, linkedinResult, geminiResult] = await Promise.all([
-    supabase.from("user_preferences").select("*").maybeSingle(),
-    supabase
-      .from("integrations")
-      .select("id,provider_username,expires_at")
-      .eq("provider", "linkedin")
-      .maybeSingle(),
-    supabase
-      .from("integrations")
-      .select("access_token")
-      .eq("provider", "gemini")
-      .maybeSingle(),
-  ]);
+  if (!user) return null;
+
+  const service = createServiceClient();
+
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  const [prefsResult, linkedinResult, aiKeysResult, todayLogs, weekLogs, monthLogs] =
+    await Promise.all([
+      service.from("user_preferences").select("*").eq("user_id", user.id).maybeSingle(),
+      service
+        .from("integrations")
+        .select("id,provider_username,expires_at")
+        .eq("user_id", user.id)
+        .eq("provider", "linkedin")
+        .maybeSingle(),
+      service
+        .from("integrations")
+        .select("provider,access_token")
+        .eq("user_id", user.id)
+        .in("provider", ["gemini", "openai", "anthropic", "deepseek"]),
+      service
+        .from("usage_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("action", "generate")
+        .gte("created_at", todayStart),
+      service
+        .from("usage_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("action", "generate")
+        .gte("created_at", weekAgo),
+      service
+        .from("usage_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("action", "generate")
+        .gte("created_at", monthStart),
+    ]);
 
   const linkedinData = linkedinResult.data as {
     id: string;
@@ -30,10 +62,18 @@ export default async function SettingsPage() {
   const linkedinExpiry = linkedinData?.expires_at ?? null;
   const linkedinUsername = linkedinData?.provider_username ?? null;
 
-  // Passa apenas os últimos 4 chars da chave — nunca a chave completa para o cliente
-  const geminiKey = (geminiResult.data as { access_token: string } | null)?.access_token ?? null;
-  const geminiConnected = !!geminiKey;
-  const geminiKeyHint = geminiKey ? `...${geminiKey.slice(-4)}` : null;
+  const aiKeyHints: Record<string, string | null> = {};
+  for (const row of aiKeysResult.data ?? []) {
+    const token = (row as { provider: string; access_token: string }).access_token;
+    const provider = (row as { provider: string }).provider;
+    aiKeyHints[provider] = token ? `...${token.slice(-4)}` : null;
+  }
+
+  const usageStats = {
+    today: todayLogs.count ?? 0,
+    week: weekLogs.count ?? 0,
+    month: monthLogs.count ?? 0,
+  };
 
   return (
     <div className="mx-auto max-w-xl">
@@ -49,8 +89,8 @@ export default async function SettingsPage() {
         linkedinConnected={linkedinConnected}
         linkedinExpiry={linkedinExpiry}
         linkedinUsername={linkedinUsername}
-        geminiConnected={geminiConnected}
-        geminiKeyHint={geminiKeyHint}
+        aiKeyHints={aiKeyHints}
+        usageStats={usageStats}
       />
     </div>
   );

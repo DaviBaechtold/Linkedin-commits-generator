@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { checkRateLimit, logUsage } from "@/lib/rate-limit";
 import { fetchCommits, formatCommitsForPrompt, type GitHubCommit } from "@/lib/github";
-import { generatePostText, generateImagePollinations } from "@/lib/gemini";
+import { generatePostText, type AIConfig } from "@/lib/ai";
+import { generateImagePollinations } from "@/lib/gemini";
+import { getDefaultModel, type AIProvider } from "@/lib/ai-providers";
 
 export const maxDuration = 60;
 
@@ -16,40 +18,24 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit
   const { allowed, remaining } = await checkRateLimit(user.id, "generate");
   if (!allowed) {
     return NextResponse.json(
-      { error: `Limite diário de gerações atingido. Tente amanhã.` },
+      { error: "Limite diário de gerações atingido. Tente amanhã." },
       { status: 429 }
     );
   }
 
   const service = createServiceClient();
 
-  // Carrega repos ativos + prefs + integrações em paralelo
-  const [reposResult, prefsResult, ghIntegration, geminiIntegration] = await Promise.all([
-    service
-      .from("repos")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("enabled", true),
-    service
-      .from("user_preferences")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle(),
+  const [reposResult, prefsResult, ghIntegration] = await Promise.all([
+    service.from("repos").select("*").eq("user_id", user.id).eq("enabled", true),
+    service.from("user_preferences").select("*").eq("user_id", user.id).maybeSingle(),
     service
       .from("integrations")
       .select("access_token,provider_username")
       .eq("user_id", user.id)
       .eq("provider", "github")
-      .maybeSingle(),
-    service
-      .from("integrations")
-      .select("access_token")
-      .eq("user_id", user.id)
-      .eq("provider", "gemini")
       .maybeSingle(),
   ]);
 
@@ -61,22 +47,33 @@ export async function POST() {
     );
   }
 
-  const geminiApiKey = geminiIntegration?.data?.access_token;
-  if (!geminiApiKey) {
-    return NextResponse.json(
-      { error: "Chave Gemini não configurada. Adicione sua API Key em Configurações." },
-      { status: 400 }
-    );
-  }
-
   const prefs = prefsResult.data;
+  const aiProvider = ((prefs?.ai_provider as AIProvider) ?? "gemini") as AIProvider;
+  const aiModel = (prefs?.ai_model as string) ?? getDefaultModel(aiProvider);
+  const profileInstructions = (prefs?.profile_instructions as string | undefined) ?? undefined;
   const language = prefs?.post_language ?? "pt-BR";
   const sinceDate = new Date();
   sinceDate.setDate(sinceDate.getDate() - (prefs?.commits_since_days ?? 30));
   const enableImages = prefs?.enable_images ?? true;
   const imageStyle = prefs?.image_style ?? "professional";
 
-  // Busca commits — GitHub API ou skip se repo sem github_full_name
+  const { data: aiIntegration } = await service
+    .from("integrations")
+    .select("access_token")
+    .eq("user_id", user.id)
+    .eq("provider", aiProvider)
+    .maybeSingle();
+
+  const aiApiKey = aiIntegration?.access_token;
+  if (!aiApiKey) {
+    return NextResponse.json(
+      { error: `Chave de API ${aiProvider} não configurada. Adicione em Configurações.` },
+      { status: 400 }
+    );
+  }
+
+  const aiConfig: AIConfig = { provider: aiProvider, model: aiModel, apiKey: aiApiKey };
+
   let allCommits: GitHubCommit[] = [];
 
   if (ghIntegration?.data?.access_token) {
@@ -86,14 +83,11 @@ export async function POST() {
     const commitArrays = await Promise.all(
       repos
         .filter((r) => r.github_full_name)
-        .map((r) =>
-          fetchCommits(token, r.github_full_name!, r.alias, sinceDate, login)
-        )
+        .map((r) => fetchCommits(token, r.github_full_name!, r.alias, sinceDate, login))
     );
     allCommits = commitArrays.flat();
   }
 
-  // Se não tem commits do GitHub, usa repos sem github_full_name como stub
   const rawLogSummary =
     allCommits.length > 0
       ? formatCommitsForPrompt(allCommits)
@@ -106,19 +100,17 @@ export async function POST() {
     );
   }
 
-  // Gera post com Gemini
   let postText: string;
   try {
-    postText = await generatePostText(rawLogSummary, language, geminiApiKey);
+    postText = await generatePostText(rawLogSummary, language, aiConfig, profileInstructions);
   } catch (err) {
-    console.error("Gemini error:", err);
+    console.error("AI generation error:", err);
     return NextResponse.json(
       { error: "Falha ao gerar texto com IA. Tente novamente." },
       { status: 500 }
     );
   }
 
-  // Gera imagem (opcional, não bloqueia)
   const draftId = Date.now().toString();
   let visualAssets: { url: string; mime_type: string }[] = [];
 
@@ -129,7 +121,6 @@ export async function POST() {
     }
   }
 
-  // Persiste rascunho
   const { data: draft, error: insertError } = await service
     .from("drafts")
     .insert({
@@ -139,17 +130,14 @@ export async function POST() {
       visual_assets: visualAssets,
       status: "pending",
       repos_used: repos.map((r) => r.alias),
-      model_used: process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite-preview",
+      model_used: `${aiProvider}/${aiModel}`,
     })
     .select()
     .single();
 
   if (insertError || !draft) {
     console.error("Insert draft error:", insertError);
-    return NextResponse.json(
-      { error: "Falha ao salvar rascunho." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Falha ao salvar rascunho." }, { status: 500 });
   }
 
   await logUsage(user.id, "generate");
