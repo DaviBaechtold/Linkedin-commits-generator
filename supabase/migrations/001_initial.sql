@@ -13,7 +13,8 @@ CREATE TABLE public.integrations (
   id              UUID    DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id         UUID    REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   provider        TEXT    NOT NULL CHECK (provider IN ('linkedin', 'github')),
-  -- Tokens armazenados com pgp_sym_encrypt — a chave vem de um secret do Vault
+  -- Tokens cifrados em repouso no nível da aplicação (AES-256-GCM, lib/crypto.ts).
+  -- Formato: "v1:iv:tag:ct". Valores legados sem prefixo são plaintext (migração transparente).
   access_token    TEXT    NOT NULL,
   refresh_token   TEXT,
   expires_at      TIMESTAMPTZ,

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { publishPost } from "@/lib/linkedin";
+import { decryptToken } from "@/lib/crypto";
 
 export const maxDuration = 60;
 
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
       }
 
       const { postId } = await publishPost(
-        linkedin.access_token as string,
+        decryptToken(linkedin.access_token as string),
         linkedin.provider_user_id as string,
         draft.post_text as string
       );

@@ -580,6 +580,11 @@ export default function SettingsForm({
               <p className="mt-1 text-xs text-white/25">
                 Horário em UTC. Para BRT (UTC-3) subtraia 3 horas.
               </p>
+              <p className="mt-1 text-xs text-yellow-300/60">
+                ⚠️ No plano Vercel Hobby o agendador roda 1×/dia (~09:00 UTC).
+                Horários muito distintos disso podem não disparar — mantenha
+                próximo de 09:00 UTC ou faça upgrade para o plano Pro.
+              </p>
             </div>
 
             <div>

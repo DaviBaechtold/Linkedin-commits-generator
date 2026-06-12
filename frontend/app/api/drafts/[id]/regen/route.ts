@@ -5,6 +5,7 @@ import { generatePostText, type AIConfig } from "@/lib/ai";
 import { generateImage, type ImageConfig } from "@/lib/image";
 import { getDefaultModel, type AIProvider } from "@/lib/ai-providers";
 import type { ImageProvider } from "@/lib/image-providers";
+import { decryptToken } from "@/lib/crypto";
 
 export const maxDuration = 60;
 
@@ -61,7 +62,9 @@ export async function POST(
       .eq("provider", aiProvider)
       .maybeSingle();
 
-    const aiApiKey = aiIntegration?.access_token;
+    const aiApiKey = aiIntegration?.access_token
+      ? decryptToken(aiIntegration.access_token)
+      : undefined;
     if (!aiApiKey) {
       return NextResponse.json(
         { error: `Chave de API ${aiProvider} não configurada.` },
@@ -82,6 +85,7 @@ export async function POST(
       .from("drafts")
       .update({ post_text: newText, status: "pending" })
       .eq("id", id)
+      .eq("user_id", user.id)
       .select()
       .single();
 
@@ -107,7 +111,7 @@ export async function POST(
       .eq("user_id", user.id)
       .eq("provider", "openai")
       .maybeSingle();
-    imageApiKey = data?.access_token ?? undefined;
+    imageApiKey = data?.access_token ? decryptToken(data.access_token) : undefined;
   } else if (imageProvider === "fal") {
     const { data } = await service
       .from("integrations")
@@ -115,7 +119,7 @@ export async function POST(
       .eq("user_id", user.id)
       .eq("provider", "fal")
       .maybeSingle();
-    imageApiKey = data?.access_token ?? undefined;
+    imageApiKey = data?.access_token ? decryptToken(data.access_token) : undefined;
   }
 
   const imageConfig: ImageConfig = { provider: imageProvider, apiKey: imageApiKey };
@@ -129,6 +133,7 @@ export async function POST(
     .from("drafts")
     .update({ visual_assets: newAssets })
     .eq("id", id)
+    .eq("user_id", user.id)
     .select()
     .single();
 

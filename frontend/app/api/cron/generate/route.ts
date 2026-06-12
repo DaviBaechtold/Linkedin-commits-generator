@@ -5,6 +5,7 @@ import { generateImage, type ImageConfig } from "@/lib/image";
 import { getDefaultModel, type AIProvider } from "@/lib/ai-providers";
 import type { ImageProvider } from "@/lib/image-providers";
 import { fetchCommits, formatCommitsForPrompt, type GitHubCommit } from "@/lib/github";
+import { decryptToken } from "@/lib/crypto";
 
 export const maxDuration = 60;
 
@@ -90,12 +91,12 @@ export async function GET(request: NextRequest) {
       const aiConfig: AIConfig = {
         provider: aiProvider,
         model: aiModel,
-        apiKey: aiIntegration.data.access_token,
+        apiKey: decryptToken(aiIntegration.data.access_token),
       };
 
       let allCommits: GitHubCommit[] = [];
       if (ghIntegration.data?.access_token) {
-        const token = ghIntegration.data.access_token;
+        const token = decryptToken(ghIntegration.data.access_token);
         const login = (ghIntegration.data.provider_username as string | null) ?? undefined;
         const arrays = await Promise.all(
           repos
@@ -123,7 +124,7 @@ export async function GET(request: NextRequest) {
             .eq("user_id", userId)
             .eq("provider", "openai")
             .maybeSingle();
-          imageApiKey = data?.access_token ?? undefined;
+          imageApiKey = data?.access_token ? decryptToken(data.access_token) : undefined;
         } else if (imageProvider === "fal") {
           const { data } = await service
             .from("integrations")
@@ -131,7 +132,7 @@ export async function GET(request: NextRequest) {
             .eq("user_id", userId)
             .eq("provider", "fal")
             .maybeSingle();
-          imageApiKey = data?.access_token ?? undefined;
+          imageApiKey = data?.access_token ? decryptToken(data.access_token) : undefined;
         }
         const imageConfig: ImageConfig = { provider: imageProvider, apiKey: imageApiKey };
         const imageUrl = await generateImage(postText, draftId, imageStyle, imageConfig);

@@ -1,0 +1,67 @@
+name: Deploy
+
+# Estratégia de branches:
+#   main → deploy de PREVIEW (ambiente de dev)
+#   prod → deploy de PRODUÇÃO (https://commitpost.vercel.app)
+#
+# O auto-deploy nativo da Vercel está desligado (frontend/vercel.json:
+# git.deploymentEnabled=false) — todo deploy passa por aqui, dando controle
+# de versão explícito entre dev e prod.
+#
+# Secrets necessárias (Settings → Secrets and variables → Actions):
+#   VERCEL_TOKEN       — token pessoal Vercel (https://vercel.com/account/tokens)
+#   VERCEL_ORG_ID      — team_Ixbodl2uLyj4AVvt1lRxvf9v
+#   VERCEL_PROJECT_ID  — prj_8DT0otG7enqNkppBLJ3P5E62MGWh
+on:
+  push:
+    branches: [main, prod]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    name: Deploy to Vercel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+
+      - name: Deploy (${{ github.ref_name == 'prod' && 'production' || 'preview' }})
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -e
+          if [ "${{ github.ref_name }}" = "prod" ]; then
+            echo "→ Deploy de PRODUÇÃO"
+            vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+            vercel build --prod --token="$VERCEL_TOKEN"
+            URL=$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          else
+            echo "→ Deploy de PREVIEW (dev)"
+            vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+            vercel build --token="$VERCEL_TOKEN"
+            URL=$(vercel deploy --prebuilt --token="$VERCEL_TOKEN")
+          fi
+          echo "Deployed: $URL"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        run: |
+          echo "### 🚀 Deploy concluído" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Branch:** \`${{ github.ref_name }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Ambiente:** ${{ github.ref_name == 'prod' && 'Produção' || 'Preview (dev)' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **URL:** ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"

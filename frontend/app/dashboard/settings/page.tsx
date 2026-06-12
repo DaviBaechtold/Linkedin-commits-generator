@@ -1,5 +1,6 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import SettingsForm from "@/components/SettingsForm";
+import { decryptToken } from "@/lib/crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -64,8 +65,10 @@ export default async function SettingsPage() {
 
   const aiKeyHints: Record<string, string | null> = {};
   for (const row of aiKeysResult.data ?? []) {
-    const token = (row as { provider: string; access_token: string }).access_token;
+    const stored = (row as { provider: string; access_token: string }).access_token;
     const provider = (row as { provider: string }).provider;
+    // Decifra para mostrar o hint dos últimos 4 chars da chave REAL (não do ciphertext).
+    const token = stored ? decryptToken(stored) : "";
     aiKeyHints[provider] = token ? `...${token.slice(-4)}` : null;
   }
 

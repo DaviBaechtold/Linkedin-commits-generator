@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { listUserRepos } from "@/lib/github";
+import { decryptToken } from "@/lib/crypto";
 
 export async function GET() {
   const supabase = await createClient();
@@ -26,7 +27,7 @@ export async function GET() {
   }
 
   try {
-    const repos = await listUserRepos(integration.access_token);
+    const repos = await listUserRepos(decryptToken(integration.access_token));
     return NextResponse.json({ repos });
   } catch {
     return NextResponse.json(

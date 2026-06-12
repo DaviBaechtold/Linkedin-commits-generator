@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { publishPost, verifyToken } from "@/lib/linkedin";
 import { logUsage } from "@/lib/rate-limit";
+import { decryptToken } from "@/lib/crypto";
 
 export const maxDuration = 30;
 
@@ -76,7 +77,7 @@ export async function POST(
   let postId: string;
   try {
     const result = await publishPost(
-      access_token,
+      decryptToken(access_token),
       provider_user_id,
       draft.post_text
     );
@@ -94,6 +95,7 @@ export async function POST(
     .from("drafts")
     .update({ status: "posted", linkedin_post_id: postId })
     .eq("id", id)
+    .eq("user_id", user.id)
     .select()
     .single();
 

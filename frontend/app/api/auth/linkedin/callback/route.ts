@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { encryptToken } from "@/lib/crypto";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -91,7 +92,7 @@ export async function GET(request: NextRequest) {
     {
       user_id: user.id,
       provider: "linkedin",
-      access_token: accessToken,
+      access_token: encryptToken(accessToken),
       expires_at: expiresAt,
       provider_user_id: personId,
       provider_username: linkedinUsername,

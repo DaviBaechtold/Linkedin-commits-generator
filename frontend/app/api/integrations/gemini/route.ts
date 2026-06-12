@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { encryptToken } from "@/lib/crypto";
 
 export async function PUT(request: NextRequest) {
   const supabase = await createClient();
@@ -30,7 +31,7 @@ export async function PUT(request: NextRequest) {
     {
       user_id: user.id,
       provider: "gemini",
-      access_token: key,
+      access_token: encryptToken(key),
     },
     { onConflict: "user_id,provider" }
   );

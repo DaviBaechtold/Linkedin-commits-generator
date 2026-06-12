@@ -13,6 +13,9 @@ frontend/out/
 # Vercel
 .vercel
 
+# Brainstorm/scratch (ruído local)
+.superpowers/
+
 # OS
 .DS_Store
 

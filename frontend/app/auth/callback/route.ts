@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { encryptToken } from "@/lib/crypto";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
       {
         user_id: data.user.id,
         provider: "github",
-        access_token: providerToken,
+        access_token: encryptToken(providerToken),
         provider_username:
           data.user.user_metadata?.user_name ??
           data.user.user_metadata?.login ??

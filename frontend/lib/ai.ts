@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import type { AIProvider } from "./ai-providers";
+import { sanitizeForNDA } from "./nda";
 
 export type { AIProvider };
 
@@ -140,16 +141,28 @@ export async function generatePostText(
   config: AIConfig,
   profileInstructions?: string
 ): Promise<string> {
+  // Filtro NDA (1/2): sanitiza o log de commits ANTES de enviar à IA —
+  // segredos não chegam sequer ao provedor de IA.
+  const safeLog = sanitizeForNDA(rawLog);
+
+  let text: string;
   switch (config.provider) {
     case "gemini":
-      return generateWithGemini(rawLog, language, config.apiKey, config.model, profileInstructions);
+      text = await generateWithGemini(safeLog, language, config.apiKey, config.model, profileInstructions);
+      break;
     case "anthropic":
-      return generateWithAnthropic(rawLog, language, config.apiKey, config.model, profileInstructions);
+      text = await generateWithAnthropic(safeLog, language, config.apiKey, config.model, profileInstructions);
+      break;
     case "openai":
-      return generateWithOpenAI(rawLog, language, config.apiKey, config.model, undefined, profileInstructions);
+      text = await generateWithOpenAI(safeLog, language, config.apiKey, config.model, undefined, profileInstructions);
+      break;
     case "deepseek":
-      return generateWithOpenAI(rawLog, language, config.apiKey, config.model, "https://api.deepseek.com", profileInstructions);
+      text = await generateWithOpenAI(safeLog, language, config.apiKey, config.model, "https://api.deepseek.com", profileInstructions);
+      break;
     default:
       throw new Error(`Provider desconhecido: ${(config as AIConfig).provider}`);
   }
+
+  // Filtro NDA (2/2): última barreira sobre o texto gerado.
+  return sanitizeForNDA(text);
 }

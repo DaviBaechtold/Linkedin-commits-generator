@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { encryptToken } from "@/lib/crypto";
 import type { AIProvider } from "@/lib/ai-providers";
 
 type AnyProvider = AIProvider | "fal";
@@ -47,7 +48,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   const { error } = await service
     .from("integrations")
     .upsert(
-      { user_id: user.id, provider, access_token: key },
+      { user_id: user.id, provider, access_token: encryptToken(key) },
       { onConflict: "user_id,provider" }
     );
 
