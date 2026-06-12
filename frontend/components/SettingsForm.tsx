@@ -14,6 +14,7 @@ import {
   Key,
   ExternalLink,
   BarChart2,
+  Zap,
 } from "lucide-react";
 
 interface Props {
@@ -81,6 +82,16 @@ export default function SettingsForm({
     openai: null,
     deepseek: null,
   });
+
+  // Auto-post
+  const [autoPost, setAutoPost] = useState({
+    auto_post_enabled: preferences?.auto_post_enabled ?? false,
+    auto_post_frequency: preferences?.auto_post_frequency ?? "weekly",
+    auto_post_hour: preferences?.auto_post_hour ?? 9,
+    auto_post_grace_hours: preferences?.auto_post_grace_hours ?? 2,
+  });
+  const [autoPostSaving, setAutoPostSaving] = useState(false);
+  const [autoPostSaved, setAutoPostSaved] = useState(false);
 
   // Danger zone
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -181,6 +192,21 @@ export default function SettingsForm({
       setDeleteError("Erro de conexão. Tente novamente.");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function saveAutoPost() {
+    setAutoPostSaving(true);
+    setAutoPostSaved(false);
+    try {
+      const res = await fetch("/api/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(autoPost),
+      });
+      if (res.ok) setAutoPostSaved(true);
+    } finally {
+      setAutoPostSaving(false);
     }
   }
 
@@ -442,6 +468,117 @@ export default function SettingsForm({
             <span className="font-mono text-white/40">{aiPrefs.ai_model}</span>
           </p>
         )}
+      </section>
+
+      {/* Auto-post */}
+      <section className="card flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <Zap className="h-4 w-4 text-brand-light" />
+          <h2 className="text-sm font-semibold text-white/80">Posts automáticos</h2>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-white/70">Gerar e publicar automaticamente</p>
+            <p className="text-xs text-white/30">
+              O CommitPost gera um post a partir dos seus commits e publica no LinkedIn. Você recebe
+              um período de revisão antes da publicação.
+            </p>
+          </div>
+          <button
+            onClick={() =>
+              setAutoPost((a) => ({ ...a, auto_post_enabled: !a.auto_post_enabled }))
+            }
+            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+              autoPost.auto_post_enabled ? "bg-brand" : "bg-white/10"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                autoPost.auto_post_enabled ? "translate-x-5" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+
+        {autoPost.auto_post_enabled && (
+          <>
+            <div>
+              <label className="label">Frequência</label>
+              <select
+                className="input"
+                value={autoPost.auto_post_frequency}
+                onChange={(e) =>
+                  setAutoPost((a) => ({ ...a, auto_post_frequency: e.target.value }))
+                }
+              >
+                <option value="daily">Diário</option>
+                <option value="weekly">Semanal</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="label">Horário preferido (UTC)</label>
+              <select
+                className="input"
+                value={autoPost.auto_post_hour}
+                onChange={(e) =>
+                  setAutoPost((a) => ({ ...a, auto_post_hour: parseInt(e.target.value) }))
+                }
+              >
+                {Array.from({ length: 24 }, (_, i) => (
+                  <option key={i} value={i}>
+                    {String(i).padStart(2, "0")}:00 UTC
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-white/25">
+                Horário em UTC. Para BRT (UTC-3) subtraia 3 horas.
+              </p>
+            </div>
+
+            <div>
+              <label className="label">Período de revisão antes de publicar</label>
+              <select
+                className="input"
+                value={autoPost.auto_post_grace_hours}
+                onChange={(e) =>
+                  setAutoPost((a) => ({ ...a, auto_post_grace_hours: parseInt(e.target.value) }))
+                }
+              >
+                <option value={1}>1 hora</option>
+                <option value={2}>2 horas</option>
+                <option value={4}>4 horas</option>
+                <option value={8}>8 horas</option>
+                <option value={12}>12 horas</option>
+                <option value={24}>24 horas</option>
+              </select>
+              <p className="mt-1 text-xs text-white/25">
+                O post fica visível no dashboard durante esse período. Você pode cancelar ou editar
+                antes da publicação automática.
+              </p>
+            </div>
+
+            {!linkedinConnected && (
+              <p className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-3 py-2 text-xs text-yellow-300/80">
+                Conecte o LinkedIn para que os posts sejam publicados automaticamente. Sem o
+                LinkedIn, os posts serão gerados mas ficarão como rascunhos pendentes.
+              </p>
+            )}
+          </>
+        )}
+
+        <div className="flex items-center gap-3">
+          <button onClick={saveAutoPost} disabled={autoPostSaving} className="btn-primary">
+            {autoPostSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Salvar
+          </button>
+          {autoPostSaved && <span className="text-sm text-green-400">Salvo!</span>}
+        </div>
       </section>
 
       {/* General preferences */}

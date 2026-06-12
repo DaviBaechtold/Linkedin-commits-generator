@@ -41,9 +41,9 @@ export async function POST(
 
   const draft = draftResult.data;
 
-  if (draft.status !== "pending") {
+  if (draft.status !== "pending" && draft.status !== "scheduled") {
     return NextResponse.json(
-      { error: "Apenas rascunhos pendentes podem ser publicados." },
+      { error: "Apenas rascunhos pendentes ou agendados podem ser publicados." },
       { status: 400 }
     );
   }

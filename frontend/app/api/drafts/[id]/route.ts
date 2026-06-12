@@ -15,7 +15,7 @@ export async function PATCH(
 
   const body = await request.json();
 
-  const validStatuses = ["pending", "discarded"] as const;
+  const validStatuses = ["pending", "discarded", "scheduled"] as const;
   type ValidStatus = (typeof validStatuses)[number];
 
   const update: {

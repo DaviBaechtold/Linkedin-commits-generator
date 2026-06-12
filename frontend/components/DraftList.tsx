@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import type { Draft } from "@/lib/supabase/types";
 import {
   Check,
@@ -13,6 +13,9 @@ import {
   Copy,
   Pencil,
   CheckCheck,
+  Trash2,
+  Clock,
+  Zap,
 } from "lucide-react";
 
 interface Props {
@@ -23,18 +26,18 @@ export default function DraftList({ initialDrafts }: Props) {
   const [drafts, setDrafts] = useState(initialDrafts);
 
   function updateDraft(updated: Draft) {
-    setDrafts((prev) =>
-      prev.map((d) => (d.id === updated.id ? updated : d))
-    );
+    setDrafts((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+  }
+
+  function removeDraft(id: string) {
+    setDrafts((prev) => prev.filter((d) => d.id !== id));
   }
 
   if (drafts.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-white/10 py-16 text-center">
         <p className="text-sm text-white/30">Nenhum rascunho ainda.</p>
-        <p className="mt-1 text-xs text-white/20">
-          Clique em "Gerar post" para começar.
-        </p>
+        <p className="mt-1 text-xs text-white/20">Clique em "Gerar post" para começar.</p>
       </div>
     );
   }
@@ -42,36 +45,74 @@ export default function DraftList({ initialDrafts }: Props) {
   return (
     <div className="flex flex-col gap-4">
       {drafts.map((draft) => (
-        <DraftCard key={draft.id} draft={draft} onUpdate={updateDraft} />
+        <DraftCard key={draft.id} draft={draft} onUpdate={updateDraft} onDelete={removeDraft} />
       ))}
     </div>
   );
 }
 
+function useCountdown(scheduledFor: string | null): string | null {
+  const [label, setLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!scheduledFor) return;
+
+    function compute() {
+      const ms = new Date(scheduledFor!).getTime() - Date.now();
+      if (ms <= 0) {
+        setLabel("publicando em breve...");
+        return;
+      }
+      const h = Math.floor(ms / 3_600_000);
+      const m = Math.floor((ms % 3_600_000) / 60_000);
+      if (h > 0) setLabel(`em ${h}h ${m}min`);
+      else setLabel(`em ${m}min`);
+    }
+
+    compute();
+    const id = setInterval(compute, 60_000);
+    return () => clearInterval(id);
+  }, [scheduledFor]);
+
+  return label;
+}
+
 function DraftCard({
   draft,
   onUpdate,
+  onDelete,
 }: {
   draft: Draft;
   onUpdate: (d: Draft) => void;
+  onDelete: (id: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(draft.status === "pending");
+  const [expanded, setExpanded] = useState(
+    draft.status === "pending" || draft.status === "scheduled"
+  );
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(draft.post_text);
   const [savingEdit, setSavingEdit] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const countdown = useCountdown(draft.scheduled_for ?? null);
+
+  // Auto-reset delete confirm after 3 seconds
+  useEffect(() => {
+    if (!deleteConfirm) return;
+    const id = setTimeout(() => setDeleteConfirm(false), 3000);
+    return () => clearTimeout(id);
+  }, [deleteConfirm]);
 
   async function apiAction(
-    action: "publish" | "discard" | "regen_text" | "regen_image"
+    action: "publish" | "discard" | "cancel_schedule" | "regen_text" | "regen_image"
   ) {
     setError(null);
 
     if (action === "publish") {
-      const res = await fetch(`/api/drafts/${draft.id}/publish`, {
-        method: "POST",
-      });
+      const res = await fetch(`/api/drafts/${draft.id}/publish`, { method: "POST" });
       const json = await res.json();
       if (!res.ok) {
         setError(json.error ?? "Falha ao publicar.");
@@ -93,6 +134,22 @@ function DraftCard({
         return;
       }
       onUpdate({ ...draft, status: "discarded" });
+      return;
+    }
+
+    if (action === "cancel_schedule") {
+      // Moves scheduled → pending (user keeps the draft for manual review)
+      const res = await fetch(`/api/drafts/${draft.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "pending" }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        setError(json.error ?? "Falha ao cancelar agendamento.");
+        return;
+      }
+      onUpdate({ ...draft, status: "pending", scheduled_for: null });
       return;
     }
 
@@ -129,6 +186,20 @@ function DraftCard({
     }
   }
 
+  async function deleteDraft() {
+    if (!deleteConfirm) {
+      setDeleteConfirm(true);
+      return;
+    }
+    setDeleting(true);
+    try {
+      await fetch(`/api/drafts/${draft.id}`, { method: "DELETE" });
+      onDelete(draft.id);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function saveEdit() {
     const trimmed = editText.trim();
     if (!trimmed || trimmed === draft.post_text) {
@@ -162,14 +233,22 @@ function DraftCard({
     }
   }
 
-  const statusBadge = {
+  const statusBadge: Record<string, React.ReactNode> = {
     pending: <span className="badge-pending">Aguardando</span>,
     posted: <span className="badge-posted">Publicado</span>,
     discarded: <span className="badge-discarded">Descartado</span>,
     regenerating: <span className="badge-regenerating">Gerando...</span>,
-  }[draft.status];
+    scheduled: (
+      <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-xs font-medium text-blue-300">
+        <Clock className="h-3 w-3" />
+        Agendado
+      </span>
+    ),
+  };
 
   const isActive = draft.status === "pending";
+  const isScheduled = draft.status === "scheduled";
+  const isInactive = draft.status === "posted" || draft.status === "discarded";
   const isLoading = draft.status === "regenerating" || isPending || savingEdit;
 
   return (
@@ -177,7 +256,13 @@ function DraftCard({
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          {statusBadge}
+          {statusBadge[draft.status]}
+          {draft.auto_generated && (
+            <span className="inline-flex items-center gap-0.5 text-xs text-white/25">
+              <Zap className="h-3 w-3" />
+              Auto
+            </span>
+          )}
           <span className="text-xs text-white/25">
             {new Date(draft.created_at).toLocaleString("pt-BR", {
               day: "2-digit",
@@ -191,15 +276,23 @@ function DraftCard({
           onClick={() => setExpanded((e) => !e)}
           className="text-white/30 hover:text-white/60"
         >
-          {expanded ? (
-            <ChevronUp className="h-4 w-4" />
-          ) : (
-            <ChevronDown className="h-4 w-4" />
-          )}
+          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </button>
       </div>
 
-      {/* Post text — preview or edit */}
+      {/* Scheduled banner */}
+      {isScheduled && countdown && (
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-blue-400" />
+            <p className="text-xs text-blue-300">
+              Publicação automática <span className="font-medium">{countdown}</span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Post text */}
       {editing ? (
         <div className="mt-3">
           <textarea
@@ -209,11 +302,7 @@ function DraftCard({
             autoFocus
           />
           <div className="mt-2 flex gap-2">
-            <button
-              onClick={saveEdit}
-              disabled={savingEdit}
-              className="btn-primary text-xs py-1.5"
-            >
+            <button onClick={saveEdit} disabled={savingEdit} className="btn-primary text-xs py-1.5">
               <Check className="h-3.5 w-3.5" />
               Salvar
             </button>
@@ -255,12 +344,10 @@ function DraftCard({
 
       {/* Error */}
       {error && (
-        <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
-          {error}
-        </p>
+        <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">{error}</p>
       )}
 
-      {/* Actions */}
+      {/* Actions — pending */}
       {expanded && isActive && !editing && (
         <div className="mt-4 flex flex-wrap gap-2">
           <button
@@ -282,11 +369,7 @@ function DraftCard({
             <Pencil className="h-4 w-4" />
             Editar
           </button>
-          <button
-            onClick={copyText}
-            disabled={isLoading}
-            className="btn-secondary"
-          >
+          <button onClick={copyText} disabled={isLoading} className="btn-secondary">
             {copied ? (
               <CheckCheck className="h-4 w-4 text-green-400" />
             ) : (
@@ -321,9 +404,47 @@ function DraftCard({
         </div>
       )}
 
-      {/* Copy button for non-active drafts */}
-      {expanded && !isActive && draft.status !== "regenerating" && (
-        <div className="mt-3">
+      {/* Actions — scheduled */}
+      {expanded && isScheduled && !editing && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            onClick={() => startTransition(() => apiAction("publish"))}
+            disabled={isLoading}
+            className="btn-primary"
+          >
+            <Check className="h-4 w-4" />
+            Publicar agora
+          </button>
+          <button onClick={copyText} disabled={isLoading} className="btn-secondary">
+            {copied ? (
+              <CheckCheck className="h-4 w-4 text-green-400" />
+            ) : (
+              <Copy className="h-4 w-4" />
+            )}
+            {copied ? "Copiado!" : "Copiar"}
+          </button>
+          <button
+            onClick={() => startTransition(() => apiAction("cancel_schedule"))}
+            disabled={isLoading}
+            className="btn-secondary"
+          >
+            <Clock className="h-4 w-4" />
+            Cancelar agendamento
+          </button>
+          <button
+            onClick={deleteDraft}
+            disabled={deleting}
+            className={deleteConfirm ? "btn-danger" : "btn-ghost text-red-400/60 hover:text-red-400"}
+          >
+            <Trash2 className="h-4 w-4" />
+            {deleteConfirm ? "Confirmar exclusão" : "Excluir"}
+          </button>
+        </div>
+      )}
+
+      {/* Actions — inactive (posted / discarded) */}
+      {expanded && isInactive && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <button onClick={copyText} className="btn-secondary text-xs py-1.5">
             {copied ? (
               <CheckCheck className="h-3.5 w-3.5 text-green-400" />
@@ -331,6 +452,18 @@ function DraftCard({
               <Copy className="h-3.5 w-3.5" />
             )}
             {copied ? "Copiado!" : "Copiar texto"}
+          </button>
+          <button
+            onClick={deleteDraft}
+            disabled={deleting}
+            className={
+              deleteConfirm
+                ? "btn-danger text-xs py-1.5"
+                : "btn-ghost text-xs py-1.5 text-red-400/50 hover:text-red-400"
+            }
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {deleteConfirm ? "Confirmar" : "Excluir"}
           </button>
         </div>
       )}

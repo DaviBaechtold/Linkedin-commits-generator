@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       drafts: {
         Row: {
+          auto_generated: boolean | null
           created_at: string | null
           id: string
           linkedin_post_id: string | null
@@ -23,12 +24,14 @@ export type Database = {
           post_text: string
           raw_log_summary: string | null
           repos_used: string[] | null
+          scheduled_for: string | null
           status: string | null
           updated_at: string | null
           user_id: string
           visual_assets: Json | null
         }
         Insert: {
+          auto_generated?: boolean | null
           created_at?: string | null
           id?: string
           linkedin_post_id?: string | null
@@ -36,12 +39,14 @@ export type Database = {
           post_text: string
           raw_log_summary?: string | null
           repos_used?: string[] | null
+          scheduled_for?: string | null
           status?: string | null
           updated_at?: string | null
           user_id: string
           visual_assets?: Json | null
         }
         Update: {
+          auto_generated?: boolean | null
           created_at?: string | null
           id?: string
           linkedin_post_id?: string | null
@@ -49,6 +54,7 @@ export type Database = {
           post_text?: string
           raw_log_summary?: string | null
           repos_used?: string[] | null
+          scheduled_for?: string | null
           status?: string | null
           updated_at?: string | null
           user_id?: string
@@ -150,6 +156,11 @@ export type Database = {
         Row: {
           ai_model: string | null
           ai_provider: string | null
+          auto_post_enabled: boolean | null
+          auto_post_frequency: string | null
+          auto_post_grace_hours: number | null
+          auto_post_hour: number | null
+          auto_post_last_generated_at: string | null
           commits_since_days: number | null
           created_at: string | null
           daily_limit: number | null
@@ -163,6 +174,11 @@ export type Database = {
         Insert: {
           ai_model?: string | null
           ai_provider?: string | null
+          auto_post_enabled?: boolean | null
+          auto_post_frequency?: string | null
+          auto_post_grace_hours?: number | null
+          auto_post_hour?: number | null
+          auto_post_last_generated_at?: string | null
           commits_since_days?: number | null
           created_at?: string | null
           daily_limit?: number | null
@@ -176,6 +192,11 @@ export type Database = {
         Update: {
           ai_model?: string | null
           ai_provider?: string | null
+          auto_post_enabled?: boolean | null
+          auto_post_frequency?: string | null
+          auto_post_grace_hours?: number | null
+          auto_post_hour?: number | null
+          auto_post_last_generated_at?: string | null
           commits_since_days?: number | null
           created_at?: string | null
           daily_limit?: number | null

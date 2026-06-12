@@ -36,10 +36,12 @@ export interface DraftRow {
   post_text: string;
   raw_log_summary: string | null;
   visual_assets: VisualAsset[];
-  status: "pending" | "posted" | "discarded" | "regenerating";
+  status: "pending" | "posted" | "discarded" | "regenerating" | "scheduled";
   linkedin_post_id: string | null;
   repos_used: string[] | null;
   model_used: string | null;
+  scheduled_for: string | null;
+  auto_generated: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -61,6 +63,11 @@ export interface UserPreferencesRow {
   ai_provider: string | null;
   ai_model: string | null;
   profile_instructions: string | null;
+  auto_post_enabled: boolean | null;
+  auto_post_frequency: string | null;
+  auto_post_hour: number | null;
+  auto_post_grace_hours: number | null;
+  auto_post_last_generated_at: string | null;
   created_at: string | null;
   updated_at: string | null;
 }

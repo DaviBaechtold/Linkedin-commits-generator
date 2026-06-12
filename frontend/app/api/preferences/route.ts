@@ -21,6 +21,10 @@ export async function PUT(request: NextRequest) {
     "ai_provider",
     "ai_model",
     "profile_instructions",
+    "auto_post_enabled",
+    "auto_post_frequency",
+    "auto_post_hour",
+    "auto_post_grace_hours",
   ] as const;
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
