@@ -6,10 +6,12 @@ import { GitBranch, Github } from "lucide-react";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
-  const supabase = createClient();
 
   async function handleGitHubLogin() {
     setLoading(true);
+    // Cliente instanciado no clique (browser), não no prerender estático —
+    // evita quebrar o build quando as env vars não estão no contexto de build.
+    const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "github",
       options: {
