@@ -167,6 +167,7 @@ export type Database = {
           enable_images: boolean | null
           image_provider: string | null
           image_style: string | null
+          onboarding_completed: boolean | null
           post_language: string | null
           profile_instructions: string | null
           updated_at: string | null
@@ -186,6 +187,7 @@ export type Database = {
           enable_images?: boolean | null
           image_provider?: string | null
           image_style?: string | null
+          onboarding_completed?: boolean | null
           post_language?: string | null
           profile_instructions?: string | null
           updated_at?: string | null
@@ -205,6 +207,7 @@ export type Database = {
           enable_images?: boolean | null
           image_provider?: string | null
           image_style?: string | null
+          onboarding_completed?: boolean | null
           post_language?: string | null
           profile_instructions?: string | null
           updated_at?: string | null
