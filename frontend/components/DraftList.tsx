@@ -19,6 +19,7 @@ import {
   Zap,
   Loader2,
   ImageOff,
+  Sparkles,
 } from "lucide-react";
 
 interface Props {
@@ -267,6 +268,29 @@ function DraftCard({
     }
   }
 
+  async function generateAiImage() {
+    setError(null);
+    setImgBusy(true);
+    if (!expanded) setExpanded(true);
+    try {
+      const res = await fetch(`/api/drafts/${draft.id}/regen`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "image" }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Falha ao gerar imagem com IA.");
+        return;
+      }
+      onUpdate(json);
+    } catch {
+      setError("Erro de conexão ao gerar imagem.");
+    } finally {
+      setImgBusy(false);
+    }
+  }
+
   function onPasteImage(e: React.ClipboardEvent) {
     if (!isActive) return;
     const item = Array.from(e.clipboardData.items).find((i) =>
@@ -501,7 +525,7 @@ function DraftCard({
             onClick={() => fileRef.current?.click()}
             disabled={isLoading || imgBusy}
             className="btn-secondary"
-            title="Anexar uma imagem (ou cole com Ctrl+V)"
+            title="Anexar uma imagem do seu computador (ou cole com Ctrl+V)"
           >
             {imgBusy ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -509,6 +533,19 @@ function DraftCard({
               <ImagePlus className="h-4 w-4" />
             )}
             {hasImage ? "Trocar imagem" : "Anexar imagem"}
+          </button>
+          <button
+            onClick={generateAiImage}
+            disabled={isLoading || imgBusy}
+            className="btn-secondary"
+            title="Gerar imagem com IA (requer chave DALL·E/Fal nas Configurações)"
+          >
+            {imgBusy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            Gerar com IA
           </button>
           <input
             ref={fileRef}

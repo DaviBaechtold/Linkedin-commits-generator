@@ -12,8 +12,8 @@ export interface ImageProviderInfo {
 
 export const IMAGE_PROVIDERS: Record<ImageProvider, ImageProviderInfo> = {
   pollinations: {
-    label: "Pollinations.ai",
-    description: "Gratuito, sem chave necessária",
+    label: "Pollinations.ai (indisponível)",
+    description: "Descontinuado — virou pago. Use DALL·E/Fal ou anexe a imagem.",
     requiresKey: false,
   },
   dalle: {

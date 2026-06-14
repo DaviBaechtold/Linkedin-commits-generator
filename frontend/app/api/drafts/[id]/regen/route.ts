@@ -132,8 +132,11 @@ export async function POST(
 
   if (!imageUrl) {
     return NextResponse.json(
-      { error: "Falha ao gerar imagem. Tente novamente." },
-      { status: 502 }
+      {
+        error:
+          "Geração por IA indisponível para o provedor atual. Configure DALL·E (OpenAI) ou Fal.ai em Configurações, ou use 'Anexar imagem'.",
+      },
+      { status: 400 }
     );
   }
 
