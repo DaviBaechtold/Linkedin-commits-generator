@@ -17,18 +17,25 @@ export default async function DashboardLayout({
 
   if (!user) redirect("/login");
 
-  // Onboarding já concluído? Heurística server-side (sobrevive a limpar cookies):
-  // se o usuário já tem chave de IA + ao menos um repo, está configurado.
-  const [aiResult, reposResult] = await Promise.all([
+  // Onboarding concluído? Duas fontes, ambas server-side (sobrevivem a limpar cookies):
+  //  1. Flag explícita no banco (usuário pulou/concluiu o tour) — fonte de verdade.
+  //  2. Heurística: já tem chave de IA + ao menos um repo → está configurado.
+  const [aiResult, reposResult, prefsResult] = await Promise.all([
     supabase
       .from("integrations")
       .select("id")
       .in("provider", ["gemini", "openai", "anthropic", "deepseek"])
       .limit(1),
     supabase.from("repos").select("id").limit(1),
+    supabase.from("user_preferences").select("*").eq("user_id", user.id).maybeSingle(),
   ]);
-  const setupComplete =
+  const onboardingFlag =
+    ((prefsResult.data as Record<string, unknown> | null)?.onboarding_completed as
+      | boolean
+      | undefined) ?? false;
+  const setupHeuristic =
     (aiResult.data?.length ?? 0) > 0 && (reposResult.data?.length ?? 0) > 0;
+  const setupComplete = onboardingFlag || setupHeuristic;
 
   const avatarUrl = user.user_metadata?.avatar_url as string | undefined;
   const name =

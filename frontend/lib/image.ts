@@ -3,6 +3,8 @@ import type { ImageProvider } from "./image-providers";
 export interface ImageConfig {
   provider: ImageProvider;
   apiKey?: string;
+  /** Seed opcional p/ variar a imagem (ex.: regenerar gera uma diferente). */
+  seed?: number;
 }
 
 function buildImagePrompt(postText: string, style: string): string {
@@ -16,25 +18,23 @@ function buildImagePrompt(postText: string, style: string): string {
   return `Abstract visualization of software development and engineering progress. ${styleDesc}. Square format 1080x1080. No text, no code, no people. Suitable for LinkedIn post illustration.`;
 }
 
-async function generateWithPollinations(
+function generateWithPollinations(
   postText: string,
   draftId: string,
-  style: string
-): Promise<string | null> {
+  style: string,
+  seed?: number
+): string {
   const prompt = buildImagePrompt(postText, style);
-  const seed = parseInt(draftId.replace(/\D/g, "").slice(0, 8)) || 42;
+  // Pollinations gera a imagem on-demand quando a URL é carregada (<img>).
+  // Não fazemos HEAD/GET aqui — isso só dispara geração e costuma dar timeout.
+  // Apenas montamos a URL determinística; o browser carrega e gera.
+  const finalSeed = seed ?? (parseInt(draftId.replace(/\D/g, "").slice(0, 8)) || 42);
   const url = new URL("https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt));
   url.searchParams.set("width", "1080");
   url.searchParams.set("height", "1080");
-  url.searchParams.set("seed", String(seed));
+  url.searchParams.set("seed", String(finalSeed));
   url.searchParams.set("nologo", "true");
-  try {
-    const res = await fetch(url.toString(), { method: "HEAD" });
-    if (res.ok) return url.toString();
-  } catch {
-    // fallback silencioso
-  }
-  return null;
+  return url.toString();
 }
 
 async function generateWithDalle(
@@ -95,12 +95,12 @@ export async function generateImage(
 ): Promise<string | null> {
   switch (config.provider) {
     case "dalle":
-      if (!config.apiKey) return generateWithPollinations(postText, draftId, style);
+      if (!config.apiKey) return generateWithPollinations(postText, draftId, style, config.seed);
       return generateWithDalle(postText, config.apiKey, style);
     case "fal":
-      if (!config.apiKey) return generateWithPollinations(postText, draftId, style);
+      if (!config.apiKey) return generateWithPollinations(postText, draftId, style, config.seed);
       return generateWithFal(postText, config.apiKey, style);
     default:
-      return generateWithPollinations(postText, draftId, style);
+      return generateWithPollinations(postText, draftId, style, config.seed);
   }
 }

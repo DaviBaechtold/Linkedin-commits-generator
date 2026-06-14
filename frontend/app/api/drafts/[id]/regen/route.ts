@@ -122,16 +122,24 @@ export async function POST(
     imageApiKey = data?.access_token ? decryptToken(data.access_token) : undefined;
   }
 
-  const imageConfig: ImageConfig = { provider: imageProvider, apiKey: imageApiKey };
+  // Seed aleatório → "Nova imagem" gera uma imagem DIFERENTE a cada clique.
+  const imageConfig: ImageConfig = {
+    provider: imageProvider,
+    apiKey: imageApiKey,
+    seed: Math.floor(Math.random() * 100_000_000),
+  };
   const imageUrl = await generateImage(draft.post_text, id, imageStyle, imageConfig);
 
-  const newAssets = imageUrl
-    ? [{ url: imageUrl, mime_type: "image/jpeg" }]
-    : draft.visual_assets;
+  if (!imageUrl) {
+    return NextResponse.json(
+      { error: "Falha ao gerar imagem. Tente novamente." },
+      { status: 502 }
+    );
+  }
 
   const { data: updated } = await service
     .from("drafts")
-    .update({ visual_assets: newAssets })
+    .update({ visual_assets: [{ url: imageUrl, mime_type: "image/jpeg" }] })
     .eq("id", id)
     .eq("user_id", user.id)
     .select()

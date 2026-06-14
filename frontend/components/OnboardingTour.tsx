@@ -231,8 +231,18 @@ export default function OnboardingTour({
     };
   }, [step, visible, current]);
 
-  function skip() {
+  function persistCompletion() {
     localStorage.setItem(STORAGE_KEY, "1");
+    // Persiste no banco (best-effort) p/ não reaparecer ao limpar storage.
+    fetch("/api/preferences", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ onboarding_completed: true }),
+    }).catch(() => {});
+  }
+
+  function skip() {
+    persistCompletion();
     setVisible(false);
   }
 

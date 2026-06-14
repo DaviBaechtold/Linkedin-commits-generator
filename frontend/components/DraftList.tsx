@@ -16,6 +16,7 @@ import {
   Trash2,
   Clock,
   Zap,
+  Loader2,
 } from "lucide-react";
 
 interface Props {
@@ -97,6 +98,7 @@ function DraftCard({
   const [copied, setCopied] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [regenImg, setRegenImg] = useState(false);
   const countdown = useCountdown(draft.scheduled_for ?? null);
 
   // Auto-reset delete confirm after 3 seconds
@@ -172,17 +174,23 @@ function DraftCard({
     }
 
     if (action === "regen_image") {
-      const res = await fetch(`/api/drafts/${draft.id}/regen`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "image" }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Falha ao regenerar imagem.");
-        return;
+      setRegenImg(true);
+      if (!expanded) setExpanded(true);
+      try {
+        const res = await fetch(`/api/drafts/${draft.id}/regen`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "image" }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          setError(json.error ?? "Falha ao regenerar imagem.");
+          return;
+        }
+        onUpdate(json);
+      } finally {
+        setRegenImg(false);
       }
-      onUpdate(json);
     }
   }
 
@@ -328,17 +336,24 @@ function DraftCard({
       )}
 
       {/* Images */}
-      {expanded && !editing && draft.visual_assets && draft.visual_assets.length > 0 && (
+      {expanded && !editing && (regenImg || (draft.visual_assets && draft.visual_assets.length > 0)) && (
         <div className="mt-3 flex flex-wrap gap-2">
-          {draft.visual_assets.map((asset, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={i}
-              src={asset.url}
-              alt={`Visual ${i + 1}`}
-              className="h-32 w-32 rounded-lg object-cover"
-            />
-          ))}
+          {regenImg ? (
+            <div className="flex h-32 w-32 flex-col items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03]">
+              <Loader2 className="h-5 w-5 animate-spin text-white/40" />
+              <span className="text-[11px] text-white/30">Gerando...</span>
+            </div>
+          ) : (
+            draft.visual_assets!.map((asset, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={i}
+                src={asset.url}
+                alt={`Visual ${i + 1}`}
+                className="h-32 w-32 rounded-lg object-cover"
+              />
+            ))
+          )}
         </div>
       )}
 
@@ -387,11 +402,15 @@ function DraftCard({
           </button>
           <button
             onClick={() => startTransition(() => apiAction("regen_image"))}
-            disabled={isLoading}
+            disabled={isLoading || regenImg}
             className="btn-secondary"
           >
-            <Image className="h-4 w-4" />
-            Nova imagem
+            {regenImg ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Image className="h-4 w-4" />
+            )}
+            {regenImg ? "Gerando imagem..." : "Nova imagem"}
           </button>
           <button
             onClick={() => startTransition(() => apiAction("discard"))}

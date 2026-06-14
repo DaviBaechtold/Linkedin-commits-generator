@@ -27,6 +27,7 @@ export async function PUT(request: NextRequest) {
     "auto_post_frequency",
     "auto_post_hour",
     "auto_post_grace_hours",
+    "onboarding_completed",
   ] as const;
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
@@ -58,6 +59,10 @@ export async function PUT(request: NextRequest) {
 
   if (update.image_provider && !VALID_IMAGE_PROVIDERS.includes(update.image_provider as string)) {
     return NextResponse.json({ error: "Provider de imagem inválido." }, { status: 400 });
+  }
+
+  if (update.onboarding_completed !== undefined) {
+    update.onboarding_completed = Boolean(update.onboarding_completed);
   }
 
   if (update.profile_instructions !== undefined) {
