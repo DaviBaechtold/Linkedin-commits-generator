@@ -18,6 +18,7 @@ import {
   Clock,
   Zap,
   Loader2,
+  ImageOff,
 } from "lucide-react";
 
 interface Props {
@@ -396,13 +397,7 @@ function DraftCard({
             </div>
           ) : (
             draft.visual_assets!.map((asset, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={i}
-                src={asset.url}
-                alt={`Visual ${i + 1}`}
-                className="h-32 w-32 rounded-lg object-cover"
-              />
+              <DraftImage key={i} url={asset.url} />
             ))
           )}
         </div>
@@ -553,5 +548,31 @@ function DraftCard({
         </div>
       )}
     </div>
+  );
+}
+
+function DraftImage({ url }: { url: string }) {
+  const [errored, setErrored] = useState(false);
+
+  if (errored) {
+    return (
+      <div className="flex h-32 w-32 flex-col items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] text-center">
+        <ImageOff className="h-5 w-5 text-white/25" />
+        <span className="px-2 text-[10px] leading-tight text-white/30">
+          Imagem indisponível
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt=""
+      loading="lazy"
+      onError={() => setErrored(true)}
+      className="h-32 w-32 rounded-lg object-cover"
+    />
   );
 }
