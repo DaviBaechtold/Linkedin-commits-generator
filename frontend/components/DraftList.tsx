@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useMemo } from "react";
 import type { Draft } from "@/lib/supabase/types";
+import DraftFilters, { type DraftFilter } from "./DraftFilters";
 import {
   Check,
   X,
@@ -23,8 +24,17 @@ interface Props {
   initialDrafts: Draft[];
 }
 
+const EMPTY_COPY: Record<DraftFilter, { title: string; sub: string }> = {
+  all: { title: "Nenhum rascunho ainda.", sub: 'Clique em "Gerar post" para começar.' },
+  pending: { title: "Nenhum rascunho pendente.", sub: "Gere um post novo para revisar." },
+  posted: { title: "Nenhum post publicado ainda.", sub: "Publique um rascunho para vê-lo aqui." },
+  scheduled: { title: "Nenhum post agendado.", sub: "Ative o auto-post nas Configurações." },
+};
+
 export default function DraftList({ initialDrafts }: Props) {
   const [drafts, setDrafts] = useState(initialDrafts);
+  const [filter, setFilter] = useState<DraftFilter>("all");
+  const [search, setSearch] = useState("");
 
   function updateDraft(updated: Draft) {
     setDrafts((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
@@ -34,20 +44,61 @@ export default function DraftList({ initialDrafts }: Props) {
     setDrafts((prev) => prev.filter((d) => d.id !== id));
   }
 
-  if (drafts.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-white/10 py-16 text-center">
-        <p className="text-sm text-white/30">Nenhum rascunho ainda.</p>
-        <p className="mt-1 text-xs text-white/20">Clique em "Gerar post" para começar.</p>
-      </div>
-    );
-  }
+  const counts = useMemo(
+    () => ({
+      all: drafts.length,
+      pending: drafts.filter((d) => d.status === "pending").length,
+      posted: drafts.filter((d) => d.status === "posted").length,
+      scheduled: drafts.filter((d) => d.status === "scheduled").length,
+    }),
+    [drafts]
+  );
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return drafts.filter((d) => {
+      if (filter !== "all" && d.status !== filter) return false;
+      if (q && !d.post_text.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [drafts, filter, search]);
 
   return (
-    <div className="flex flex-col gap-4">
-      {drafts.map((draft) => (
-        <DraftCard key={draft.id} draft={draft} onUpdate={updateDraft} onDelete={removeDraft} />
-      ))}
+    <div>
+      <DraftFilters
+        filter={filter}
+        onFilter={setFilter}
+        search={search}
+        onSearch={setSearch}
+        counts={counts}
+      />
+
+      {visible.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-white/10 py-16 text-center">
+          {search.trim() ? (
+            <p className="text-sm text-white/30">
+              Nada encontrado para “{search.trim()}”.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-white/30">{EMPTY_COPY[filter].title}</p>
+              <p className="mt-1 text-xs text-white/20">{EMPTY_COPY[filter].sub}</p>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {visible.map((draft, i) => (
+            <div
+              key={draft.id}
+              style={{ animation: `draftIn .4s ${Math.min(i, 8) * 50}ms ease both` }}
+            >
+              <DraftCard draft={draft} onUpdate={updateDraft} onDelete={removeDraft} />
+            </div>
+          ))}
+        </div>
+      )}
+      <style>{`@keyframes draftIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
     </div>
   );
 }
