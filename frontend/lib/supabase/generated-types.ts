@@ -17,8 +17,11 @@ export type Database = {
       drafts: {
         Row: {
           auto_generated: boolean | null
+          comments_count: number | null
           created_at: string | null
+          engagement_synced_at: string | null
           id: string
+          likes_count: number | null
           linkedin_post_id: string | null
           model_used: string | null
           post_text: string
@@ -32,8 +35,11 @@ export type Database = {
         }
         Insert: {
           auto_generated?: boolean | null
+          comments_count?: number | null
           created_at?: string | null
+          engagement_synced_at?: string | null
           id?: string
+          likes_count?: number | null
           linkedin_post_id?: string | null
           model_used?: string | null
           post_text: string
@@ -47,8 +53,11 @@ export type Database = {
         }
         Update: {
           auto_generated?: boolean | null
+          comments_count?: number | null
           created_at?: string | null
+          engagement_synced_at?: string | null
           id?: string
+          likes_count?: number | null
           linkedin_post_id?: string | null
           model_used?: string | null
           post_text?: string

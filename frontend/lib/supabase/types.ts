@@ -42,6 +42,9 @@ export interface DraftRow {
   model_used: string | null;
   scheduled_for: string | null;
   auto_generated: boolean | null;
+  likes_count: number | null;
+  comments_count: number | null;
+  engagement_synced_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -69,6 +72,7 @@ export interface UserPreferencesRow {
   auto_post_grace_hours: number | null;
   auto_post_last_generated_at: string | null;
   image_provider: string | null;
+  onboarding_completed: boolean | null;
   created_at: string | null;
   updated_at: string | null;
 }

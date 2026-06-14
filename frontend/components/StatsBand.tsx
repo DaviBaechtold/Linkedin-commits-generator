@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, Clock, CalendarClock, Sparkles, type LucideIcon } from "lucide-react";
+import { Send, Clock, CalendarClock, Sparkles, Heart, type LucideIcon } from "lucide-react";
 
 export interface Stat {
   key: string;
   label: string;
   value: number;
-  icon: "posted" | "pending" | "scheduled" | "generated";
+  icon: "posted" | "pending" | "scheduled" | "generated" | "engagement";
   accent: string;
 }
 
@@ -16,6 +16,7 @@ const ICONS: Record<Stat["icon"], LucideIcon> = {
   pending: Clock,
   scheduled: CalendarClock,
   generated: Sparkles,
+  engagement: Heart,
 };
 
 function useCountUp(target: number, durationMs = 900) {
@@ -73,7 +74,7 @@ export default function StatsBand({ stats }: { stats: Stat[] }) {
   return (
     <>
       <style>{`@keyframes statIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}`}</style>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((s, i) => (
           <StatCard key={s.key} stat={s} index={i} />
         ))}

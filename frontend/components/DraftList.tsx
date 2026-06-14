@@ -20,6 +20,8 @@ import {
   Loader2,
   ImageOff,
   Sparkles,
+  Heart,
+  MessageCircle,
 } from "lucide-react";
 
 interface Props {
@@ -152,6 +154,7 @@ function DraftCard({
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [imgBusy, setImgBusy] = useState(false);
+  const [syncingEng, setSyncingEng] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const countdown = useCountdown(draft.scheduled_for ?? null);
 
@@ -288,6 +291,27 @@ function DraftCard({
       setError("Erro de conexão ao gerar imagem.");
     } finally {
       setImgBusy(false);
+    }
+  }
+
+  async function refreshEngagement() {
+    setError(null);
+    setSyncingEng(true);
+    try {
+      const res = await fetch(`/api/drafts/${draft.id}/engagement`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Falha ao atualizar métricas.");
+        return;
+      }
+      if (json.draft) onUpdate(json.draft);
+      if (!json.synced) {
+        setError("Métricas indisponíveis no momento (a API do LinkedIn não retornou dados).");
+      }
+    } catch {
+      setError("Erro de conexão ao atualizar métricas.");
+    } finally {
+      setSyncingEng(false);
     }
   }
 
@@ -630,6 +654,42 @@ function DraftCard({
             <Trash2 className="h-3.5 w-3.5" />
             {deleteConfirm ? "Confirmar" : "Excluir"}
           </button>
+        </div>
+      )}
+
+      {/* Engajamento (posts publicados) */}
+      {draft.status === "posted" && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+          <span className="inline-flex items-center gap-1.5 text-sm text-white/75">
+            <Heart className="h-4 w-4 text-red-400/80" />
+            <span className="tabular-nums">{draft.likes_count ?? "—"}</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-sm text-white/75">
+            <MessageCircle className="h-4 w-4 text-blue-400/80" />
+            <span className="tabular-nums">{draft.comments_count ?? "—"}</span>
+          </span>
+          <button
+            onClick={refreshEngagement}
+            disabled={syncingEng}
+            className="btn-ghost text-xs py-1"
+          >
+            {syncingEng ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3 w-3" />
+            )}
+            Atualizar métricas
+          </button>
+          {draft.engagement_synced_at && (
+            <span className="text-xs text-white/25">
+              {new Date(draft.engagement_synced_at).toLocaleString("pt-BR", {
+                day: "2-digit",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
         </div>
       )}
 

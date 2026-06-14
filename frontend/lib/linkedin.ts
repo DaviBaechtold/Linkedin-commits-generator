@@ -122,6 +122,50 @@ export async function publishPost(
   return { postId: data.id ?? data.value };
 }
 
+export interface PostEngagement {
+  likes: number;
+  comments: number;
+}
+
+/**
+ * Busca curtidas/comentários de um post via socialActions (best-effort).
+ * Impressões NÃO são expostas para perfil pessoal. Retorna null se a API
+ * bloquear/falhar (o app degrada para "—").
+ */
+export async function getPostEngagement(
+  accessToken: string,
+  postUrn: string
+): Promise<PostEngagement | null> {
+  try {
+    const res = await fetch(
+      `${LINKEDIN_API}/socialActions/${encodeURIComponent(postUrn)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "X-Restli-Protocol-Version": "2.0.0",
+        },
+      }
+    );
+    if (!res.ok) {
+      console.error("LinkedIn socialActions failed:", res.status);
+      return null;
+    }
+    const data = await res.json();
+    const likes =
+      data.likesSummary?.totalLikes ??
+      data.likesSummary?.aggregatedTotalLikes ??
+      0;
+    const comments =
+      data.commentsSummary?.aggregatedTotalComments ??
+      data.commentsSummary?.totalFirstLevelComments ??
+      0;
+    return { likes: Number(likes) || 0, comments: Number(comments) || 0 };
+  } catch (err) {
+    console.error("LinkedIn engagement error:", err);
+    return null;
+  }
+}
+
 /** Verifica se o token ainda é válido */
 export async function verifyToken(accessToken: string): Promise<boolean> {
   try {

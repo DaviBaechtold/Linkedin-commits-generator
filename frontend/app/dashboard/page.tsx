@@ -31,6 +31,7 @@ export default async function DashboardPage() {
     linkedinResult,
     reposResult,
     aiResult,
+    engagementResult,
   ] = await Promise.all([
     supabase.from("drafts").select("*").order("created_at", { ascending: false }).limit(20),
     supabase.from("drafts").select("id", head).eq("status", "posted"),
@@ -54,6 +55,7 @@ export default async function DashboardPage() {
       .select("id")
       .in("provider", ["gemini", "openai", "anthropic", "deepseek"])
       .limit(1),
+    supabase.from("drafts").select("likes_count,comments_count").eq("status", "posted"),
   ]);
 
   const drafts = (draftsResult.data ?? []) as Draft[];
@@ -61,12 +63,23 @@ export default async function DashboardPage() {
   const hasRepos = (reposResult.data?.length ?? 0) > 0;
   const hasAI = (aiResult.data?.length ?? 0) > 0;
 
+  // Engajamento total (curtidas + comentários dos posts publicados)
+  const engRows = (engagementResult.data ?? []) as {
+    likes_count: number | null;
+    comments_count: number | null;
+  }[];
+  const totalEngagement = engRows.reduce(
+    (s, r) => s + (r.likes_count ?? 0) + (r.comments_count ?? 0),
+    0
+  );
+
   // Stats band
   const stats: Stat[] = [
     { key: "posted", label: "Publicados", value: postedCount.count ?? 0, icon: "posted", accent: "#10B981" },
     { key: "pending", label: "Pendentes", value: pendingCount.count ?? 0, icon: "pending", accent: "#F59E0B" },
     { key: "scheduled", label: "Agendados", value: scheduledCount.count ?? 0, icon: "scheduled", accent: "#378FE9" },
     { key: "generated", label: "Gerados no mês", value: monthGenCount.count ?? 0, icon: "generated", accent: "#8B5CF6" },
+    { key: "engagement", label: "Engajamento", value: totalEngagement, icon: "engagement", accent: "#EF4444" },
   ];
 
   // Activity (8 semanas)
