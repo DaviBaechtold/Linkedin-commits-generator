@@ -18,23 +18,12 @@ function buildImagePrompt(postText: string, style: string): string {
   return `Abstract visualization of software development and engineering progress. ${styleDesc}. Square format 1080x1080. No text, no code, no people. Suitable for LinkedIn post illustration.`;
 }
 
-function generateWithPollinations(
-  postText: string,
-  draftId: string,
-  style: string,
-  seed?: number
-): string {
-  const prompt = buildImagePrompt(postText, style);
-  // Pollinations gera a imagem on-demand quando a URL é carregada (<img>).
-  // Não fazemos HEAD/GET aqui — isso só dispara geração e costuma dar timeout.
-  // Apenas montamos a URL determinística; o browser carrega e gera.
-  const finalSeed = seed ?? (parseInt(draftId.replace(/\D/g, "").slice(0, 8)) || 42);
-  const url = new URL("https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt));
-  url.searchParams.set("width", "1080");
-  url.searchParams.set("height", "1080");
-  url.searchParams.set("seed", String(finalSeed));
-  url.searchParams.set("nologo", "true");
-  return url.toString();
+function generateWithPollinations(): null {
+  // Pollinations.ai monetizou (protocolo x402): o tier gratuito anônimo retorna
+  // HTTP 402 e não serve mais imagens. Desativado — retorna null para não gravar
+  // URLs quebradas. Usuários anexam a própria imagem (upload) ou usam DALL·E/Fal
+  // com chave BYOK. Mantido o stub para compatibilidade do switch de provider.
+  return null;
 }
 
 async function generateWithDalle(
@@ -95,12 +84,12 @@ export async function generateImage(
 ): Promise<string | null> {
   switch (config.provider) {
     case "dalle":
-      if (!config.apiKey) return generateWithPollinations(postText, draftId, style, config.seed);
+      if (!config.apiKey) return generateWithPollinations();
       return generateWithDalle(postText, config.apiKey, style);
     case "fal":
-      if (!config.apiKey) return generateWithPollinations(postText, draftId, style, config.seed);
+      if (!config.apiKey) return generateWithPollinations();
       return generateWithFal(postText, config.apiKey, style);
     default:
-      return generateWithPollinations(postText, draftId, style, config.seed);
+      return generateWithPollinations();
   }
 }

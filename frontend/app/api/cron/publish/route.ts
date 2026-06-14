@@ -52,10 +52,12 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      const assets = (draft.visual_assets as { url?: string }[] | null) ?? [];
       const { postId } = await publishPost(
         decryptToken(linkedin.access_token as string),
         linkedin.provider_user_id as string,
-        draft.post_text as string
+        draft.post_text as string,
+        assets[0]?.url ?? null
       );
 
       await service

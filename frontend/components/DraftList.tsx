@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useTransition, useEffect, useMemo } from "react";
+import { useState, useTransition, useEffect, useMemo, useRef } from "react";
 import type { Draft } from "@/lib/supabase/types";
 import DraftFilters, { type DraftFilter } from "./DraftFilters";
 import {
   Check,
   X,
   RefreshCw,
-  Image,
+  ImagePlus,
   ExternalLink,
   ChevronDown,
   ChevronUp,
@@ -150,7 +150,8 @@ function DraftCard({
   const [copied, setCopied] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [regenImg, setRegenImg] = useState(false);
+  const [imgBusy, setImgBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const countdown = useCountdown(draft.scheduled_for ?? null);
 
   // Auto-reset delete confirm after 3 seconds
@@ -161,7 +162,7 @@ function DraftCard({
   }, [deleteConfirm]);
 
   async function apiAction(
-    action: "publish" | "discard" | "cancel_schedule" | "regen_text" | "regen_image"
+    action: "publish" | "discard" | "cancel_schedule" | "regen_text"
   ) {
     setError(null);
 
@@ -225,23 +226,57 @@ function DraftCard({
       return;
     }
 
-    if (action === "regen_image") {
-      setRegenImg(true);
-      if (!expanded) setExpanded(true);
-      try {
-        const res = await fetch(`/api/drafts/${draft.id}/regen`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "image" }),
-        });
-        const json = await res.json();
-        if (!res.ok) {
-          setError(json.error ?? "Falha ao regenerar imagem.");
-          return;
-        }
-        onUpdate(json);
-      } finally {
-        setRegenImg(false);
+  }
+
+  async function uploadImage(file: File) {
+    setError(null);
+    if (!file.type.startsWith("image/")) {
+      setError("Selecione um arquivo de imagem.");
+      return;
+    }
+    setImgBusy(true);
+    if (!expanded) setExpanded(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/drafts/${draft.id}/image`, {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Falha ao anexar imagem.");
+        return;
+      }
+      onUpdate(json);
+    } catch {
+      setError("Erro de conexão ao enviar imagem.");
+    } finally {
+      setImgBusy(false);
+    }
+  }
+
+  async function removeImage() {
+    setImgBusy(true);
+    try {
+      const res = await fetch(`/api/drafts/${draft.id}/image`, { method: "DELETE" });
+      const json = await res.json();
+      if (res.ok) onUpdate(json);
+    } finally {
+      setImgBusy(false);
+    }
+  }
+
+  function onPasteImage(e: React.ClipboardEvent) {
+    if (!isActive) return;
+    const item = Array.from(e.clipboardData.items).find((i) =>
+      i.type.startsWith("image/")
+    );
+    if (item) {
+      const file = item.getAsFile();
+      if (file) {
+        e.preventDefault();
+        uploadImage(file);
       }
     }
   }
@@ -307,12 +342,17 @@ function DraftCard({
   };
 
   const isActive = draft.status === "pending";
+  const hasImage = (draft.visual_assets?.length ?? 0) > 0;
   const isScheduled = draft.status === "scheduled";
   const isInactive = draft.status === "posted" || draft.status === "discarded";
   const isLoading = draft.status === "regenerating" || isPending || savingEdit;
 
   return (
-    <div className="card">
+    <div
+      className="card outline-none"
+      tabIndex={isActive ? 0 : undefined}
+      onPaste={onPasteImage}
+    >
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -388,16 +428,27 @@ function DraftCard({
       )}
 
       {/* Images */}
-      {expanded && !editing && (regenImg || (draft.visual_assets && draft.visual_assets.length > 0)) && (
+      {expanded && !editing && (imgBusy || (draft.visual_assets && draft.visual_assets.length > 0)) && (
         <div className="mt-3 flex flex-wrap gap-2">
-          {regenImg ? (
+          {imgBusy ? (
             <div className="flex h-32 w-32 flex-col items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03]">
               <Loader2 className="h-5 w-5 animate-spin text-white/40" />
-              <span className="text-[11px] text-white/30">Gerando...</span>
+              <span className="text-[11px] text-white/30">Enviando...</span>
             </div>
           ) : (
             draft.visual_assets!.map((asset, i) => (
-              <DraftImage key={i} url={asset.url} />
+              <div key={i} className="group relative">
+                <DraftImage url={asset.url} />
+                {isActive && (
+                  <button
+                    onClick={removeImage}
+                    title="Remover imagem"
+                    className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white/70 opacity-0 transition-opacity hover:bg-black/80 hover:text-white group-hover:opacity-100"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             ))
           )}
         </div>
@@ -447,17 +498,29 @@ function DraftCard({
             Regenerar texto
           </button>
           <button
-            onClick={() => startTransition(() => apiAction("regen_image"))}
-            disabled={isLoading || regenImg}
+            onClick={() => fileRef.current?.click()}
+            disabled={isLoading || imgBusy}
             className="btn-secondary"
+            title="Anexar uma imagem (ou cole com Ctrl+V)"
           >
-            {regenImg ? (
+            {imgBusy ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Image className="h-4 w-4" />
+              <ImagePlus className="h-4 w-4" />
             )}
-            {regenImg ? "Gerando imagem..." : "Nova imagem"}
+            {hasImage ? "Trocar imagem" : "Anexar imagem"}
           </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) uploadImage(f);
+              e.target.value = "";
+            }}
+          />
           <button
             onClick={() => startTransition(() => apiAction("discard"))}
             disabled={isLoading}

@@ -76,10 +76,13 @@ export async function POST(
   // Publica
   let postId: string;
   try {
+    const assets = (draft.visual_assets as { url?: string }[] | null) ?? [];
+    const imageUrl = assets[0]?.url ?? null;
     const result = await publishPost(
       decryptToken(access_token),
       provider_user_id,
-      draft.post_text
+      draft.post_text,
+      imageUrl
     );
     postId = result.postId;
   } catch (err) {
