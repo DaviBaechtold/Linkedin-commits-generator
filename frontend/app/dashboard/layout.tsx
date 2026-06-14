@@ -17,6 +17,19 @@ export default async function DashboardLayout({
 
   if (!user) redirect("/login");
 
+  // Onboarding já concluído? Heurística server-side (sobrevive a limpar cookies):
+  // se o usuário já tem chave de IA + ao menos um repo, está configurado.
+  const [aiResult, reposResult] = await Promise.all([
+    supabase
+      .from("integrations")
+      .select("id")
+      .in("provider", ["gemini", "openai", "anthropic", "deepseek"])
+      .limit(1),
+    supabase.from("repos").select("id").limit(1),
+  ]);
+  const setupComplete =
+    (aiResult.data?.length ?? 0) > 0 && (reposResult.data?.length ?? 0) > 0;
+
   const avatarUrl = user.user_metadata?.avatar_url as string | undefined;
   const name =
     (user.user_metadata?.full_name as string) ??
@@ -26,7 +39,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen">
-      <OnboardingTour />
+      <OnboardingTour setupComplete={setupComplete} />
       {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 flex w-56 flex-col border-r border-white/5 bg-[rgb(15,15,18)]">
         {/* Logo */}

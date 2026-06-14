@@ -180,13 +180,13 @@ export default function LandingPage() {
             Seus commits viram
           </h1>
 
-          {/* Cycling line */}
+          {/* Cycling line — altura reservada p/ até 2 linhas, sem clip dos descendentes */}
           <div
-            className="mb-8 flex h-[68px] items-center justify-center overflow-hidden sm:h-20"
+            className="mb-8 flex min-h-[2.5em] items-center justify-center text-5xl sm:min-h-[2.4em] sm:text-6xl"
             style={{ animation: "fadeUp .5s .3s ease both" }}
           >
             <span
-              className={`${syne.className} ${fading ? "cycle-out" : "cycle-in"} inline-block text-5xl font-extrabold text-brand-light sm:text-6xl`}
+              className={`${syne.className} ${fading ? "cycle-out" : "cycle-in"} block px-2 pb-2 text-center font-extrabold leading-[1.12] text-brand-light`}
             >
               {text}
             </span>

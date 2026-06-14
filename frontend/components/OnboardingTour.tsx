@@ -171,7 +171,11 @@ function findWithRetry(target: string, onFound: (el: Element) => void, max = 25)
   attempt();
 }
 
-export default function OnboardingTour() {
+export default function OnboardingTour({
+  setupComplete = false,
+}: {
+  setupComplete?: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -181,8 +185,15 @@ export default function OnboardingTour() {
   const [navigating, setNavigating] = useState(false);
 
   useEffect(() => {
+    // Usuário já configurado (chave de IA + repos) → nunca mostra o tour,
+    // mesmo após limpar cookies/localStorage. Persiste o estado localmente
+    // para refletir o setup concluído em futuras visitas neste navegador.
+    if (setupComplete) {
+      localStorage.setItem(STORAGE_KEY, "1");
+      return;
+    }
     if (!localStorage.getItem(STORAGE_KEY)) setVisible(true);
-  }, []);
+  }, [setupComplete]);
 
   const current = STEPS[step];
 
