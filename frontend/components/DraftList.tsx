@@ -511,9 +511,9 @@ function DraftCard({
       {expanded && !editing && (imgBusy || (draft.visual_assets && draft.visual_assets.length > 0)) && (
         <div className="mt-3 flex flex-wrap gap-2">
           {imgBusy ? (
-            <div className="flex h-32 w-32 flex-col items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03]">
+            <div className="flex aspect-square w-48 flex-col items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] sm:w-64">
               <Loader2 className="h-5 w-5 animate-spin text-white/40" />
-              <span className="text-[11px] text-white/30">Enviando...</span>
+              <span className="text-[11px] text-white/30">Processando...</span>
             </div>
           ) : (
             draft.visual_assets!.map((asset, i) => (
@@ -790,9 +790,9 @@ function DraftImage({ url }: { url: string }) {
 
   if (errored) {
     return (
-      <div className="flex h-32 w-32 flex-col items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] text-center">
+      <div className="flex aspect-square w-48 flex-col items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] text-center sm:w-64">
         <ImageOff className="h-5 w-5 text-white/25" />
-        <span className="px-2 text-[10px] leading-tight text-white/30">
+        <span className="px-2 text-[11px] leading-tight text-white/30">
           Imagem indisponível
         </span>
       </div>
@@ -800,13 +800,25 @@ function DraftImage({ url }: { url: string }) {
   }
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={url}
-      alt=""
-      loading="lazy"
-      onError={() => setErrored(true)}
-      className="h-32 w-32 rounded-lg object-cover"
-    />
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Abrir imagem em tamanho real"
+      className="group relative block w-48 overflow-hidden rounded-lg sm:w-64"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt=""
+        loading="lazy"
+        onError={() => setErrored(true)}
+        className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+      />
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-gradient-to-t from-black/70 to-transparent py-2 text-[11px] text-white/0 transition-colors group-hover:text-white/80">
+        <ExternalLink className="h-3 w-3" />
+        ver em tamanho real
+      </span>
+    </a>
   );
 }
