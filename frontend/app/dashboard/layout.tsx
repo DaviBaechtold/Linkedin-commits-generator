@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { GitBranch, LayoutDashboard, Database, Settings, LogOut } from "lucide-react";
 import LogoutButton from "@/components/LogoutButton";
+import NotificationBell from "@/components/NotificationBell";
 import OnboardingTour from "@/components/OnboardingTour";
 
 export default async function DashboardLayout({
@@ -53,6 +54,9 @@ export default async function DashboardLayout({
         <div className="flex h-14 items-center gap-2 border-b border-white/5 px-4">
           <GitBranch className="h-5 w-5 text-brand" suppressHydrationWarning />
           <span className="font-semibold text-white">CommitPost</span>
+          <div className="ml-auto">
+            <NotificationBell />
+          </div>
         </div>
 
         {/* Nav */}

@@ -6,6 +6,7 @@ import { getDefaultModel, type AIProvider } from "@/lib/ai-providers";
 import type { ImageProvider } from "@/lib/image-providers";
 import { fetchCommits, formatCommitsForPrompt, type GitHubCommit } from "@/lib/github";
 import { decryptToken } from "@/lib/crypto";
+import { notify } from "@/lib/notifications";
 
 export const maxDuration = 60;
 
@@ -163,26 +164,48 @@ export async function GET(request: NextRequest) {
         ? new Date(Date.now() + graceHours * 3_600_000).toISOString()
         : null;
 
-      await service.from("drafts").insert({
-        user_id: userId,
-        post_text: postText,
-        raw_log_summary: rawLogSummary,
-        visual_assets: visualAssets,
-        status: hasLinkedIn ? "scheduled" : "pending",
-        repos_used: repos.map((r) => r.alias),
-        model_used: `${aiProvider}/${aiModel}`,
-        scheduled_for: scheduledFor,
-        auto_generated: true,
-      });
+      const { data: newDraft } = await service
+        .from("drafts")
+        .insert({
+          user_id: userId,
+          post_text: postText,
+          raw_log_summary: rawLogSummary,
+          visual_assets: visualAssets,
+          status: hasLinkedIn ? "scheduled" : "pending",
+          repos_used: repos.map((r) => r.alias),
+          model_used: `${aiProvider}/${aiModel}`,
+          scheduled_for: scheduledFor,
+          auto_generated: true,
+        })
+        .select("id")
+        .single();
 
       await service
         .from("user_preferences")
         .update({ auto_post_last_generated_at: new Date().toISOString() })
         .eq("user_id", userId);
 
+      await notify(
+        service,
+        userId,
+        "auto_post_generated",
+        "Post automático gerado",
+        hasLinkedIn
+          ? `Revise antes de publicar — vai ao ar automaticamente em ~${graceHours}h se não for alterado.`
+          : "Está aguardando sua revisão manual no painel.",
+        newDraft?.id ?? null
+      );
+
       generated++;
     } catch (err) {
       console.error(`Auto-generate error for user ${userId}:`, err);
+      await notify(
+        service,
+        userId,
+        "auto_post_failed",
+        "Falha ao gerar post automático",
+        "Algo deu errado na geração. Verifique sua chave de IA e seus repositórios em Configurações."
+      );
     }
   }
 

@@ -7,6 +7,22 @@ export interface VisualAsset {
 
 // ---- Row types ----
 
+export type NotificationType =
+  | "auto_post_generated"
+  | "auto_post_published"
+  | "auto_post_failed";
+
+export interface NotificationRow {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  draft_id: string | null;
+  read: boolean;
+  created_at: string;
+}
+
 export interface IntegrationRow {
   id: string;
   user_id: string;
@@ -107,6 +123,11 @@ export interface Database {
         Insert: Partial<UserPreferencesRow> & { user_id: string };
         Update: Partial<Omit<UserPreferencesRow, "user_id">>;
       };
+      notifications: {
+        Row: NotificationRow;
+        Insert: Omit<NotificationRow, "id" | "created_at" | "read"> & { read?: boolean };
+        Update: Partial<Omit<NotificationRow, "id" | "created_at" | "user_id">>;
+      };
     };
   };
 }
@@ -118,3 +139,4 @@ export type Repo = RepoRow;
 export type Draft = DraftRow;
 export type UsageLog = UsageLogRow;
 export type UserPreferences = UserPreferencesRow;
+export type Notification = NotificationRow;
