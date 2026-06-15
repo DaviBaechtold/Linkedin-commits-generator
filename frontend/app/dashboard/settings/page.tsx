@@ -79,7 +79,7 @@ export default async function SettingsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-xl">
+    <div className="mx-auto max-w-5xl">
       <div className="mb-6">
         <h1 className="text-lg font-semibold text-white">Configurações</h1>
         <p className="mt-1 text-sm text-white/40">

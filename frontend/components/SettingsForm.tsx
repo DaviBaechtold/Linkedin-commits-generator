@@ -259,7 +259,7 @@ export default function SettingsForm({
   const activeProviderInfo = PROVIDERS[aiPrefs.ai_provider as AIProvider];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="columns-1 gap-6 lg:columns-2 [&>section]:mb-6 [&>section]:break-inside-avoid">
       {/* LinkedIn */}
       <section className="card" data-tutorial="linkedin">
         <h2 className="mb-4 text-sm font-semibold text-white/80">Integração LinkedIn</h2>
