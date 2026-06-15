@@ -3,6 +3,8 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { encryptToken } from "@/lib/crypto";
 import type { AIProvider } from "@/lib/ai-providers";
 
+export const maxDuration = 30;
+
 type AnyProvider = AIProvider | "fal" | "cloudflare";
 
 const VALID_PROVIDERS: AnyProvider[] = ["gemini", "openai", "anthropic", "deepseek", "fal", "cloudflare"];
@@ -16,7 +18,7 @@ const KEY_PREFIXES: Record<AnyProvider, string> = {
   cloudflare: "", // Cloudflare tokens have no standard prefix
 };
 
-/** Valida o token Cloudflare e retorna o account id (auto-detectado). */
+/** Tenta auto-detectar o account id (só funciona se o token tiver permissão de listar contas). */
 async function resolveCloudflareAccount(token: string): Promise<string | null> {
   try {
     const res = await fetch("https://api.cloudflare.com/client/v4/accounts", {
@@ -27,6 +29,23 @@ async function resolveCloudflareAccount(token: string): Promise<string | null> {
     return data.result?.[0]?.id ?? null;
   } catch {
     return null;
+  }
+}
+
+/** Valida token+account fazendo uma geração FLUX real (definitivo). */
+async function validateCloudflare(token: string, accountId: string): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: "test", steps: 4 }),
+      }
+    );
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -45,7 +64,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { api_key } = await request.json();
+  const body = await request.json();
+  const api_key = body.api_key;
   if (!api_key || typeof api_key !== "string" || !api_key.trim()) {
     return NextResponse.json({ error: "Chave inválida." }, { status: 400 });
   }
@@ -59,13 +79,28 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     );
   }
 
-  // Cloudflare: valida o token e auto-detecta o account id.
+  // Cloudflare: usa o account id informado (ou tenta auto-detectar) e valida.
   let cloudflareAccountId: string | null = null;
   if (provider === "cloudflare") {
-    cloudflareAccountId = await resolveCloudflareAccount(key);
+    const provided =
+      typeof body.account_id === "string" ? body.account_id.trim() : "";
+    cloudflareAccountId = provided || (await resolveCloudflareAccount(key));
     if (!cloudflareAccountId) {
       return NextResponse.json(
-        { error: "Token Cloudflare inválido ou sem permissão de conta. Verifique o token." },
+        {
+          error:
+            "Informe o Account ID da Cloudflare (esse tipo de token não permite detectá-lo automaticamente).",
+        },
+        { status: 400 }
+      );
+    }
+    const valid = await validateCloudflare(key, cloudflareAccountId);
+    if (!valid) {
+      return NextResponse.json(
+        {
+          error:
+            "Token ou Account ID inválido, ou o token não tem permissão Workers AI. Confira ambos.",
+        },
         { status: 400 }
       );
     }

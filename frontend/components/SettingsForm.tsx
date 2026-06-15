@@ -103,6 +103,7 @@ export default function SettingsForm({
   const [falKeyError, setFalKeyError] = useState<string | null>(null);
 
   // Cloudflare Workers AI (imagem grátis)
+  const [cfAccountInput, setCfAccountInput] = useState("");
   const [cfKeyInput, setCfKeyInput] = useState("");
   const [cfKeySaving, setCfKeySaving] = useState(false);
   const [cfKeyHint, setCfKeyHint] = useState<string | null>(aiKeyHints["cloudflare"] ?? null);
@@ -230,14 +231,15 @@ export default function SettingsForm({
 
   async function saveCloudflareKey() {
     const key = cfKeyInput.trim();
-    if (!key) return;
+    const accountId = cfAccountInput.trim();
+    if (!key || !accountId) return;
     setCfKeySaving(true);
     setCfKeyError(null);
     try {
       const res = await fetch("/api/integrations/ai/cloudflare", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: key }),
+        body: JSON.stringify({ api_key: key, account_id: accountId }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -246,6 +248,7 @@ export default function SettingsForm({
       }
       setCfKeyHint(`...${key.slice(-4)}`);
       setCfKeyInput("");
+      setCfAccountInput("");
     } finally {
       setCfKeySaving(false);
     }
@@ -763,16 +766,24 @@ export default function SettingsForm({
                       </p>
                     )}
                     <p className="text-xs leading-relaxed text-white/40">
-                      Crie um token em <span className="text-white/60">My Profile → API Tokens</span> com
-                      permissão <span className="text-white/60">Workers AI: Read</span> (ou use o template
-                      &quot;Workers AI&quot;). O Account ID é detectado automaticamente.
+                      Crie um token com o template <span className="text-white/60">Workers AI</span>. O{" "}
+                      <span className="text-white/60">Account ID</span> fica no painel da Cloudflare
+                      (Workers &amp; Pages → barra lateral direita, ou na URL após <code>dash.cloudflare.com/</code>).
                     </p>
+                    <input
+                      type="text"
+                      className="input font-mono"
+                      value={cfAccountInput}
+                      onChange={(e) => setCfAccountInput(e.target.value)}
+                      placeholder="Account ID (ex: 1a2b3c...)"
+                      autoComplete="off"
+                    />
                     <input
                       type="password"
                       className="input"
                       value={cfKeyInput}
                       onChange={(e) => setCfKeyInput(e.target.value)}
-                      placeholder="token da Cloudflare"
+                      placeholder="Token da Cloudflare"
                       autoComplete="off"
                       onKeyDown={(e) => e.key === "Enter" && saveCloudflareKey()}
                     />
@@ -788,7 +799,7 @@ export default function SettingsForm({
                       </a>
                       <button
                         onClick={saveCloudflareKey}
-                        disabled={cfKeySaving || !cfKeyInput.trim()}
+                        disabled={cfKeySaving || !cfKeyInput.trim() || !cfAccountInput.trim()}
                         className="btn-primary"
                       >
                         {cfKeySaving ? (
@@ -796,7 +807,7 @@ export default function SettingsForm({
                         ) : (
                           <Key className="h-4 w-4" />
                         )}
-                        Salvar
+                        {cfKeySaving ? "Validando..." : "Salvar"}
                       </button>
                     </div>
                   </>
