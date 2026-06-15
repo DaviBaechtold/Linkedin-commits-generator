@@ -117,6 +117,7 @@ export async function GET(request: NextRequest) {
       let visualAssets: { url: string; mime_type: string }[] = [];
       if (enableImages) {
         let imageApiKey: string | undefined;
+        let imageAccountId: string | undefined;
         if (imageProvider === "dalle") {
           const { data } = await service
             .from("integrations")
@@ -133,8 +134,22 @@ export async function GET(request: NextRequest) {
             .eq("provider", "fal")
             .maybeSingle();
           imageApiKey = data?.access_token ? decryptToken(data.access_token) : undefined;
+        } else if (imageProvider === "cloudflare") {
+          const { data } = await service
+            .from("integrations")
+            .select("access_token,provider_user_id")
+            .eq("user_id", userId)
+            .eq("provider", "cloudflare")
+            .maybeSingle();
+          imageApiKey = data?.access_token ? decryptToken(data.access_token) : undefined;
+          imageAccountId = data?.provider_user_id ?? undefined;
         }
-        const imageConfig: ImageConfig = { provider: imageProvider, apiKey: imageApiKey };
+        const imageConfig: ImageConfig = {
+          provider: imageProvider,
+          apiKey: imageApiKey,
+          accountId: imageAccountId,
+          userId,
+        };
         const imageUrl = await generateImage(postText, draftId, imageStyle, imageConfig);
         if (imageUrl) visualAssets = [{ url: imageUrl, mime_type: "image/jpeg" }];
       }

@@ -1,4 +1,4 @@
-export type ImageProvider = "pollinations" | "dalle" | "fal";
+export type ImageProvider = "cloudflare" | "pollinations" | "dalle" | "fal";
 
 export interface ImageProviderInfo {
   label: string;
@@ -11,9 +11,17 @@ export interface ImageProviderInfo {
 }
 
 export const IMAGE_PROVIDERS: Record<ImageProvider, ImageProviderInfo> = {
+  cloudflare: {
+    label: "Cloudflare Workers AI (grátis)",
+    description: "FLUX schnell — grátis (~dezenas de imagens/dia). Requer token Cloudflare.",
+    requiresKey: true,
+    integrationProvider: "cloudflare",
+    keyLinkLabel: "Criar token em dash.cloudflare.com",
+    keyLinkUrl: "https://dash.cloudflare.com/profile/api-tokens",
+  },
   pollinations: {
     label: "Pollinations.ai (indisponível)",
-    description: "Descontinuado — virou pago. Use DALL·E/Fal ou anexe a imagem.",
+    description: "Descontinuado — virou pago. Use Cloudflare (grátis), DALL·E/Fal ou anexe a imagem.",
     requiresKey: false,
   },
   dalle: {

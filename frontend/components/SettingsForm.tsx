@@ -102,6 +102,12 @@ export default function SettingsForm({
   const [falKeyHint, setFalKeyHint] = useState<string | null>(aiKeyHints["fal"] ?? null);
   const [falKeyError, setFalKeyError] = useState<string | null>(null);
 
+  // Cloudflare Workers AI (imagem grátis)
+  const [cfKeyInput, setCfKeyInput] = useState("");
+  const [cfKeySaving, setCfKeySaving] = useState(false);
+  const [cfKeyHint, setCfKeyHint] = useState<string | null>(aiKeyHints["cloudflare"] ?? null);
+  const [cfKeyError, setCfKeyError] = useState<string | null>(null);
+
   // Danger zone
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -219,6 +225,42 @@ export default function SettingsForm({
       }
     } finally {
       setFalKeySaving(false);
+    }
+  }
+
+  async function saveCloudflareKey() {
+    const key = cfKeyInput.trim();
+    if (!key) return;
+    setCfKeySaving(true);
+    setCfKeyError(null);
+    try {
+      const res = await fetch("/api/integrations/ai/cloudflare", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: key }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setCfKeyError(json.error ?? "Falha ao salvar token.");
+        return;
+      }
+      setCfKeyHint(`...${key.slice(-4)}`);
+      setCfKeyInput("");
+    } finally {
+      setCfKeySaving(false);
+    }
+  }
+
+  async function removeCloudflareKey() {
+    setCfKeySaving(true);
+    try {
+      await fetch("/api/integrations/ai/cloudflare", { method: "DELETE" });
+      setCfKeyHint(null);
+      if (prefs.image_provider === "cloudflare") {
+        setPrefs((p) => ({ ...p, image_provider: "pollinations" }));
+      }
+    } finally {
+      setCfKeySaving(false);
     }
   }
 
@@ -684,7 +726,7 @@ export default function SettingsForm({
                         <p className="text-sm font-medium text-white/80">{info.label}</p>
                         <p className="text-xs text-white/35">{info.description}</p>
                       </div>
-                      {p === "pollinations" && (
+                      {p === "cloudflare" && (
                         <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-xs text-green-400">
                           Gratuito
                         </span>
@@ -694,6 +736,73 @@ export default function SettingsForm({
                 })}
               </div>
             </div>
+
+            {/* Cloudflare Workers AI (grátis) */}
+            {prefs.image_provider === "cloudflare" && (
+              <div className="flex flex-col gap-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
+                <p className="text-xs font-medium text-white/60">Token Cloudflare (Workers AI)</p>
+                {cfKeyHint ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-400" />
+                      <div>
+                        <p className="text-sm text-white/80">Conectado</p>
+                        <p className="font-mono text-xs text-white/30">{cfKeyHint}</p>
+                      </div>
+                    </div>
+                    <button onClick={removeCloudflareKey} disabled={cfKeySaving} className="btn-ghost">
+                      {cfKeySaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      Remover
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {cfKeyError && (
+                      <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                        {cfKeyError}
+                      </p>
+                    )}
+                    <p className="text-xs leading-relaxed text-white/40">
+                      Crie um token em <span className="text-white/60">My Profile → API Tokens</span> com
+                      permissão <span className="text-white/60">Workers AI: Read</span> (ou use o template
+                      &quot;Workers AI&quot;). O Account ID é detectado automaticamente.
+                    </p>
+                    <input
+                      type="password"
+                      className="input"
+                      value={cfKeyInput}
+                      onChange={(e) => setCfKeyInput(e.target.value)}
+                      placeholder="token da Cloudflare"
+                      autoComplete="off"
+                      onKeyDown={(e) => e.key === "Enter" && saveCloudflareKey()}
+                    />
+                    <div className="flex items-center justify-between">
+                      <a
+                        href="https://dash.cloudflare.com/profile/api-tokens"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-0.5 text-xs text-brand-light hover:underline"
+                      >
+                        Criar token na Cloudflare
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                      <button
+                        onClick={saveCloudflareKey}
+                        disabled={cfKeySaving || !cfKeyInput.trim()}
+                        className="btn-primary"
+                      >
+                        {cfKeySaving ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Key className="h-4 w-4" />
+                        )}
+                        Salvar
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* DALL-E status (uses OpenAI key) */}
             {prefs.image_provider === "dalle" && (

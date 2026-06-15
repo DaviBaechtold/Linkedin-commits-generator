@@ -104,6 +104,7 @@ export async function POST(
   const imageProvider = ((prefs?.image_provider as ImageProvider) ?? "pollinations") as ImageProvider;
 
   let imageApiKey: string | undefined;
+  let imageAccountId: string | undefined;
   if (imageProvider === "dalle") {
     const { data } = await service
       .from("integrations")
@@ -120,12 +121,23 @@ export async function POST(
       .eq("provider", "fal")
       .maybeSingle();
     imageApiKey = data?.access_token ? decryptToken(data.access_token) : undefined;
+  } else if (imageProvider === "cloudflare") {
+    const { data } = await service
+      .from("integrations")
+      .select("access_token,provider_user_id")
+      .eq("user_id", user.id)
+      .eq("provider", "cloudflare")
+      .maybeSingle();
+    imageApiKey = data?.access_token ? decryptToken(data.access_token) : undefined;
+    imageAccountId = data?.provider_user_id ?? undefined;
   }
 
   // Seed aleatório → "Nova imagem" gera uma imagem DIFERENTE a cada clique.
   const imageConfig: ImageConfig = {
     provider: imageProvider,
     apiKey: imageApiKey,
+    accountId: imageAccountId,
+    userId: user.id,
     seed: Math.floor(Math.random() * 100_000_000),
   };
   const imageUrl = await generateImage(draft.post_text, id, imageStyle, imageConfig);

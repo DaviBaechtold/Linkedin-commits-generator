@@ -1,8 +1,12 @@
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { ImageProvider } from "./image-providers";
 
 export interface ImageConfig {
   provider: ImageProvider;
   apiKey?: string;
+  /** Cloudflare: account id (a imagem gerada é salva no Supabase Storage). */
+  accountId?: string;
+  userId?: string;
   /** Seed opcional p/ variar a imagem (ex.: regenerar gera uma diferente). */
   seed?: number;
 }
@@ -76,6 +80,58 @@ async function generateWithFal(
   }
 }
 
+async function generateWithCloudflare(
+  accountId: string,
+  token: string,
+  postText: string,
+  style: string,
+  userId: string,
+  draftId: string,
+  seed?: number
+): Promise<string | null> {
+  const prompt = buildImagePrompt(postText, style);
+  try {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prompt, steps: 6 }),
+      }
+    );
+    if (!res.ok) {
+      console.error("Cloudflare image failed:", res.status);
+      return null;
+    }
+    const data = await res.json();
+    const b64: string | undefined = data.result?.image;
+    if (!b64) return null;
+    const bytes = Buffer.from(b64, "base64");
+
+    // Cloudflare devolve base64 → salvamos no Supabase Storage (bucket público).
+    const service = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    );
+    const path = `${userId}/${draftId}-cf-${seed ?? 0}.jpg`;
+    const { error } = await service.storage
+      .from("post-images")
+      .upload(path, bytes, { contentType: "image/jpeg", upsert: true });
+    if (error) {
+      console.error("Cloudflare image storage upload failed:", error);
+      return null;
+    }
+    return service.storage.from("post-images").getPublicUrl(path).data.publicUrl;
+  } catch (err) {
+    console.error("Cloudflare image error:", err);
+    return null;
+  }
+}
+
 export async function generateImage(
   postText: string,
   draftId: string,
@@ -83,6 +139,17 @@ export async function generateImage(
   config: ImageConfig
 ): Promise<string | null> {
   switch (config.provider) {
+    case "cloudflare":
+      if (!config.accountId || !config.apiKey || !config.userId) return null;
+      return generateWithCloudflare(
+        config.accountId,
+        config.apiKey,
+        postText,
+        style,
+        config.userId,
+        draftId,
+        config.seed
+      );
     case "dalle":
       if (!config.apiKey) return generateWithPollinations();
       return generateWithDalle(postText, config.apiKey, style);
