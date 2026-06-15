@@ -104,3 +104,13 @@ export const AI_PROVIDERS = Object.keys(PROVIDERS) as AIProvider[];
 export function getDefaultModel(provider: AIProvider): string {
   return PROVIDERS[provider].models[0].id;
 }
+
+export type ToneStyle = "balanced" | "technical" | "storytelling" | "achievement" | "reflection";
+
+export const TONE_OPTIONS: { id: ToneStyle; label: string; desc: string }[] = [
+  { id: "balanced",     label: "Equilibrado",  desc: "Tom neutro e profissional (padrão)" },
+  { id: "technical",    label: "Técnico",       desc: "Foco em arquitetura e engenharia" },
+  { id: "storytelling", label: "Narrativo",     desc: "História com contexto e resolução" },
+  { id: "achievement",  label: "Conquista",     desc: "Celebra marcos e resultados" },
+  { id: "reflection",   label: "Reflexivo",     desc: "Compartilha aprendizados e erros" },
+];

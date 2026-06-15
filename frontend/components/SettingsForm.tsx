@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { UserPreferences } from "@/lib/supabase/types";
-import { PROVIDERS, AI_PROVIDERS, getDefaultModel, type AIProvider } from "@/lib/ai-providers";
+import { PROVIDERS, AI_PROVIDERS, getDefaultModel, TONE_OPTIONS, type AIProvider, type ToneStyle } from "@/lib/ai-providers";
 import { IMAGE_PROVIDERS, IMAGE_PROVIDER_LIST, type ImageProvider } from "@/lib/image-providers";
 import {
   Linkedin,
@@ -57,9 +57,15 @@ export default function SettingsForm({
     ai_provider: initialProvider,
     ai_model: (preferences?.ai_model as string) ?? getDefaultModel(initialProvider),
     profile_instructions: preferences?.profile_instructions ?? "",
+    tone_style: (preferences?.tone_style as ToneStyle) ?? "balanced",
   });
   const [aiPrefsSaving, setAiPrefsSaving] = useState(false);
   const [aiPrefsSaved, setAiPrefsSaved] = useState(false);
+
+  // NDA personalizado
+  const [ndaRules, setNdaRules] = useState(preferences?.nda_custom_rules ?? "");
+  const [ndaSaving, setNdaSaving] = useState(false);
+  const [ndaSaved, setNdaSaved] = useState(false);
 
   // Per-provider key management
   const [activeTab, setActiveTab] = useState<AIProvider>(initialProvider);
@@ -299,6 +305,21 @@ export default function SettingsForm({
     }
   }
 
+  async function saveNdaRules() {
+    setNdaSaving(true);
+    setNdaSaved(false);
+    try {
+      const res = await fetch("/api/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nda_custom_rules: ndaRules }),
+      });
+      if (res.ok) setNdaSaved(true);
+    } finally {
+      setNdaSaving(false);
+    }
+  }
+
   async function saveAutoPost() {
     setAutoPostSaving(true);
     setAutoPostSaved(false);
@@ -530,6 +551,27 @@ export default function SettingsForm({
           </p>
         </div>
 
+        <div>
+          <label className="label">Tom do post</label>
+          <p className="mb-2 text-xs text-white/35">Estilo narrativo usado ao gerar os posts.</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {TONE_OPTIONS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setAiPrefs((a) => ({ ...a, tone_style: t.id }))}
+                className={`flex flex-col gap-0.5 rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                  aiPrefs.tone_style === t.id
+                    ? "border-brand/50 bg-brand/10"
+                    : "border-white/5 bg-white/[0.02] hover:border-white/15"
+                }`}
+              >
+                <span className="text-sm font-medium text-white/80">{t.label}</span>
+                <span className="text-xs text-white/35">{t.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="flex items-center gap-3">
           <button onClick={saveAiPrefs} disabled={aiPrefsSaving} className="btn-primary">
             {aiPrefsSaving ? (
@@ -540,6 +582,36 @@ export default function SettingsForm({
             Salvar
           </button>
           {aiPrefsSaved && <span className="text-sm text-green-400">Salvo!</span>}
+        </div>
+      </section>
+
+      {/* NDA personalizado */}
+      <section className="card flex flex-col gap-4">
+        <h2 className="text-sm font-semibold text-white/80">Filtro NDA personalizado</h2>
+        <p className="text-xs text-white/35">
+          Palavras ou frases que serão automaticamente ocultadas nos posts antes de salvar.
+          Separe por vírgulas ou uma por linha.
+        </p>
+        <textarea
+          className="input min-h-[100px] resize-y"
+          value={ndaRules}
+          onChange={(e) => setNdaRules(e.target.value)}
+          placeholder={"Cliente ACME, Projeto X, nomeInterno"}
+          maxLength={2000}
+        />
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-white/20">{ndaRules.length}/2000</p>
+          <div className="flex items-center gap-3">
+            {ndaSaved && <span className="text-sm text-green-400">Salvo!</span>}
+            <button onClick={saveNdaRules} disabled={ndaSaving} className="btn-primary">
+              {ndaSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Salvar
+            </button>
+          </div>
         </div>
       </section>
 

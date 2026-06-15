@@ -11,8 +11,9 @@ export async function PUT(request: NextRequest) {
 
   const body = await request.json();
 
-  const VALID_PROVIDERS = ["gemini", "openai", "anthropic", "deepseek"];
+  const VALID_PROVIDERS = ["gemini", "openai", "anthropic", "deepseek", "groq", "mistral", "xai"];
   const VALID_IMAGE_PROVIDERS = ["cloudflare", "pollinations", "dalle", "fal"];
+  const VALID_TONES = ["balanced", "technical", "storytelling", "achievement", "reflection"];
 
   const allowed = [
     "post_language",
@@ -23,6 +24,8 @@ export async function PUT(request: NextRequest) {
     "ai_provider",
     "ai_model",
     "profile_instructions",
+    "tone_style",
+    "nda_custom_rules",
     "auto_post_enabled",
     "auto_post_frequency",
     "auto_post_hour",
@@ -55,6 +58,19 @@ export async function PUT(request: NextRequest) {
 
   if (update.ai_provider && !VALID_PROVIDERS.includes(update.ai_provider as string)) {
     return NextResponse.json({ error: "Provider de IA inválido." }, { status: 400 });
+  }
+
+  if (update.tone_style && !VALID_TONES.includes(update.tone_style as string)) {
+    return NextResponse.json({ error: "Tom inválido." }, { status: 400 });
+  }
+
+  if (update.nda_custom_rules !== undefined) {
+    if (typeof update.nda_custom_rules !== "string") {
+      return NextResponse.json({ error: "nda_custom_rules inválido." }, { status: 400 });
+    }
+    if ((update.nda_custom_rules as string).length > 2000) {
+      return NextResponse.json({ error: "Regras NDA muito longas (máx. 2000 chars)." }, { status: 400 });
+    }
   }
 
   if (update.image_provider && !VALID_IMAGE_PROVIDERS.includes(update.image_provider as string)) {

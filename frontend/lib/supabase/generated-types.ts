@@ -20,6 +20,7 @@ export type Database = {
           comments_count: number | null
           created_at: string | null
           engagement_synced_at: string | null
+          hashtags: string[] | null
           id: string
           likes_count: number | null
           linkedin_post_id: string | null
@@ -38,6 +39,7 @@ export type Database = {
           comments_count?: number | null
           created_at?: string | null
           engagement_synced_at?: string | null
+          hashtags?: string[] | null
           id?: string
           likes_count?: number | null
           linkedin_post_id?: string | null
@@ -56,6 +58,7 @@ export type Database = {
           comments_count?: number | null
           created_at?: string | null
           engagement_synced_at?: string | null
+          hashtags?: string[] | null
           id?: string
           likes_count?: number | null
           linkedin_post_id?: string | null
@@ -209,9 +212,11 @@ export type Database = {
           enable_images: boolean | null
           image_provider: string | null
           image_style: string | null
+          nda_custom_rules: string | null
           onboarding_completed: boolean | null
           post_language: string | null
           profile_instructions: string | null
+          tone_style: string | null
           updated_at: string | null
           user_id: string
         }
@@ -229,9 +234,11 @@ export type Database = {
           enable_images?: boolean | null
           image_provider?: string | null
           image_style?: string | null
+          nda_custom_rules?: string | null
           onboarding_completed?: boolean | null
           post_language?: string | null
           profile_instructions?: string | null
+          tone_style?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -249,9 +256,11 @@ export type Database = {
           enable_images?: boolean | null
           image_provider?: string | null
           image_style?: string | null
+          nda_custom_rules?: string | null
           onboarding_completed?: boolean | null
           post_language?: string | null
           profile_instructions?: string | null
+          tone_style?: string | null
           updated_at?: string | null
           user_id?: string
         }

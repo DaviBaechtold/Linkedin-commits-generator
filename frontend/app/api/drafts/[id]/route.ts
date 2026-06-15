@@ -21,6 +21,7 @@ export async function PATCH(
   const update: {
     status?: ValidStatus;
     post_text?: string;
+    hashtags?: string[];
   } = {};
 
   if (body.status !== undefined) {
@@ -34,6 +35,16 @@ export async function PATCH(
     const text = String(body.post_text).trim();
     if (!text) return NextResponse.json({ error: "Texto não pode ser vazio." }, { status: 400 });
     update.post_text = text;
+  }
+
+  if (body.hashtags !== undefined) {
+    if (!Array.isArray(body.hashtags)) {
+      return NextResponse.json({ error: "hashtags deve ser um array." }, { status: 400 });
+    }
+    update.hashtags = (body.hashtags as unknown[])
+      .filter((t): t is string => typeof t === "string")
+      .map((t) => (t.startsWith("#") ? t : `#${t}`))
+      .slice(0, 10);
   }
 
   const service = createServiceClient();

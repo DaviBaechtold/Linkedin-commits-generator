@@ -181,6 +181,9 @@ function DraftCard({
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(draft.post_text);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [hashtags, setHashtags] = useState<string[]>(draft.hashtags ?? []);
+  const [newTag, setNewTag] = useState("");
+  const [addingTag, setAddingTag] = useState(false);
   const [copied, setCopied] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -386,6 +389,37 @@ function DraftCard({
     }
   }
 
+  async function updateHashtags(tags: string[]) {
+    const res = await fetch(`/api/drafts/${draft.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hashtags: tags }),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      setHashtags(json.hashtags ?? []);
+      onUpdate(json);
+    }
+  }
+
+  async function removeHashtag(tag: string) {
+    const updated = hashtags.filter((t) => t !== tag);
+    setHashtags(updated);
+    await updateHashtags(updated);
+  }
+
+  async function addHashtag() {
+    const tag = newTag.trim().replace(/\s+/g, "");
+    if (!tag) return;
+    const formatted = tag.startsWith("#") ? tag : `#${tag}`;
+    if (hashtags.includes(formatted) || hashtags.length >= 10) return;
+    const updated = [...hashtags, formatted];
+    setHashtags(updated);
+    setNewTag("");
+    setAddingTag(false);
+    await updateHashtags(updated);
+  }
+
   async function saveEdit() {
     const trimmed = editText.trim();
     if (!trimmed || trimmed === draft.post_text) {
@@ -529,6 +563,56 @@ function DraftCard({
         >
           {draft.post_text}
         </p>
+      )}
+
+      {/* Hashtag chips */}
+      {expanded && !editing && (hashtags.length > 0 || isActive || isScheduled) && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {hashtags.map((tag) => (
+            <span
+              key={tag}
+              className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2.5 py-0.5 text-xs text-brand-light"
+            >
+              {tag}
+              {(isActive || isScheduled) && (
+                <button
+                  onClick={() => removeHashtag(tag)}
+                  className="ml-0.5 text-brand-light/50 hover:text-brand-light"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </span>
+          ))}
+          {(isActive || isScheduled) && hashtags.length < 10 && (
+            addingTag ? (
+              <div className="flex items-center gap-1">
+                <input
+                  autoFocus
+                  className="h-6 w-28 rounded-full border border-brand/30 bg-brand/5 px-2.5 text-xs text-white/80 outline-none"
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  placeholder="#hashtag"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") addHashtag();
+                    if (e.key === "Escape") { setAddingTag(false); setNewTag(""); }
+                  }}
+                  onBlur={() => { if (!newTag.trim()) setAddingTag(false); }}
+                />
+                <button onClick={addHashtag} className="text-brand-light/60 hover:text-brand-light">
+                  <Check className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setAddingTag(true)}
+                className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-white/15 px-2 py-0.5 text-xs text-white/30 hover:border-white/30 hover:text-white/50"
+              >
+                + hashtag
+              </button>
+            )
+          )}
+        </div>
       )}
 
       {/* Insights de geração */}

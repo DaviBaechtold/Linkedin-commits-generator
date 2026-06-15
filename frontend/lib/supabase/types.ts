@@ -56,6 +56,7 @@ export interface DraftRow {
   linkedin_post_id: string | null;
   repos_used: string[] | null;
   model_used: string | null;
+  hashtags: string[] | null;
   scheduled_for: string | null;
   auto_generated: boolean | null;
   likes_count: number | null;
@@ -88,6 +89,8 @@ export interface UserPreferencesRow {
   auto_post_grace_hours: number | null;
   auto_post_last_generated_at: string | null;
   image_provider: string | null;
+  tone_style: string | null;
+  nda_custom_rules: string | null;
   onboarding_completed: boolean | null;
   created_at: string | null;
   updated_at: string | null;

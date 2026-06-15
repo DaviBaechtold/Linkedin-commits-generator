@@ -63,6 +63,27 @@ export function sanitizeForNDA(text: string): string {
 }
 
 /**
+ * Aplica regras NDA personalizadas do usuário (palavras/frases separadas por
+ * newline ou vírgula). Chamado ANTES de enviar à IA e DEPOIS de receber o texto.
+ */
+export function applyCustomNDA(text: string, rules: string | null | undefined): string {
+  if (!text || !rules?.trim()) return text;
+  const words = rules.split(/[\n,]+/).map((w) => w.trim()).filter(Boolean);
+  let out = text;
+  for (const word of words) {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(new RegExp(escaped, "gi"), REDACTION);
+  }
+  return out;
+}
+
+/** Extrai hashtags do texto gerado (último parágrafo ou todas as ocorrências). */
+export function extractHashtags(text: string): string[] {
+  const all = text.match(/#[A-Za-zÀ-ÿ0-9_]+/g) ?? [];
+  return [...new Set(all)].slice(0, 10);
+}
+
+/**
  * Verifica se um texto ainda contém padrões sensíveis após a sanitização.
  * Útil para logging/alertas sem bloquear a publicação.
  */

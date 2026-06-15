@@ -31,12 +31,26 @@ DIRETRIZES DE ESTILO:
 - Inclua 3-5 hashtags relevantes ao final
 - Escreva no idioma especificado`;
 
-function buildUserPrompt(rawLog: string, language: string, profileInstructions?: string): string {
+const TONE_PROMPTS: Record<string, string> = {
+  balanced:     "",
+  technical:    "\nTom do post: técnico e detalhado — priorize decisões de arquitetura, tecnologias usadas e aprendizados de engenharia.",
+  storytelling: "\nTom do post: narrativo e envolvente — estruture como uma história com contexto, desafio e resolução.",
+  achievement:  "\nTom do post: celebratório e confiante — destaque conquistas, marcos alcançados e impacto mensurável.",
+  reflection:   "\nTom do post: reflexivo — compartilhe aprendizados, erros superados e crescimento profissional.",
+};
+
+function buildUserPrompt(
+  rawLog: string,
+  language: string,
+  profileInstructions?: string,
+  toneStyle?: string
+): string {
   const profileSection = profileInstructions?.trim()
     ? `\n\nInstruções de perfil do autor:\n${profileInstructions.trim()}`
     : "";
+  const toneSection = TONE_PROMPTS[toneStyle ?? "balanced"] ?? "";
 
-  return `Idioma do post: ${language}${profileSection}
+  return `Idioma do post: ${language}${toneSection}${profileSection}
 
 Commits recentes (os nomes de repositórios são aliases, não reais):
 ${rawLog}
@@ -50,10 +64,11 @@ async function generateWithGemini(
   language: string,
   apiKey: string,
   model: string,
-  profileInstructions?: string
+  profileInstructions?: string,
+  toneStyle?: string
 ): Promise<string> {
   const ai = new GoogleGenAI({ apiKey });
-  const userPrompt = buildUserPrompt(rawLog, language, profileInstructions);
+  const userPrompt = buildUserPrompt(rawLog, language, profileInstructions, toneStyle);
 
   const fallbackModels = [model, "gemini-3.1-flash-lite-preview", "gemini-1.5-flash"];
   const seen = new Set<string>();
@@ -88,10 +103,11 @@ async function generateWithAnthropic(
   language: string,
   apiKey: string,
   model: string,
-  profileInstructions?: string
+  profileInstructions?: string,
+  toneStyle?: string
 ): Promise<string> {
   const client = new Anthropic({ apiKey });
-  const userPrompt = buildUserPrompt(rawLog, language, profileInstructions);
+  const userPrompt = buildUserPrompt(rawLog, language, profileInstructions, toneStyle);
 
   const message = await client.messages.create({
     model,
@@ -115,10 +131,11 @@ async function generateWithOpenAI(
   apiKey: string,
   model: string,
   baseURL?: string,
-  profileInstructions?: string
+  profileInstructions?: string,
+  toneStyle?: string
 ): Promise<string> {
   const client = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
-  const userPrompt = buildUserPrompt(rawLog, language, profileInstructions);
+  const userPrompt = buildUserPrompt(rawLog, language, profileInstructions, toneStyle);
 
   const response = await client.chat.completions.create({
     model,
@@ -146,7 +163,8 @@ export async function generatePostText(
   rawLog: string,
   language: string,
   config: AIConfig,
-  profileInstructions?: string
+  profileInstructions?: string,
+  toneStyle?: string
 ): Promise<string> {
   // Filtro NDA (1/2): sanitiza o log de commits ANTES de enviar à IA —
   // segredos não chegam sequer ao provedor de IA.
@@ -155,10 +173,10 @@ export async function generatePostText(
   let text: string;
   switch (config.provider) {
     case "gemini":
-      text = await generateWithGemini(safeLog, language, config.apiKey, config.model, profileInstructions);
+      text = await generateWithGemini(safeLog, language, config.apiKey, config.model, profileInstructions, toneStyle);
       break;
     case "anthropic":
-      text = await generateWithAnthropic(safeLog, language, config.apiKey, config.model, profileInstructions);
+      text = await generateWithAnthropic(safeLog, language, config.apiKey, config.model, profileInstructions, toneStyle);
       break;
     case "openai":
     case "deepseek":
@@ -168,7 +186,8 @@ export async function generatePostText(
       text = await generateWithOpenAI(
         safeLog, language, config.apiKey, config.model,
         OPENAI_COMPAT_URLS[config.provider],
-        profileInstructions
+        profileInstructions,
+        toneStyle
       );
       break;
     default:

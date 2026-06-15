@@ -7,6 +7,7 @@ import { generateImage, type ImageConfig } from "@/lib/image";
 import { getDefaultModel, type AIProvider } from "@/lib/ai-providers";
 import type { ImageProvider } from "@/lib/image-providers";
 import { decryptToken } from "@/lib/crypto";
+import { applyCustomNDA, extractHashtags } from "@/lib/nda";
 
 export const maxDuration = 60;
 
@@ -53,6 +54,8 @@ export async function POST() {
   const aiProvider = ((prefs?.ai_provider as AIProvider) ?? "gemini") as AIProvider;
   const aiModel = (prefs?.ai_model as string) ?? getDefaultModel(aiProvider);
   const profileInstructions = (prefs?.profile_instructions as string | undefined) ?? undefined;
+  const toneStyle = (prefs?.tone_style as string | undefined) ?? "balanced";
+  const customNdaRules = (prefs?.nda_custom_rules as string | undefined) ?? undefined;
   const language = prefs?.post_language ?? "pt-BR";
   const sinceDate = new Date();
   sinceDate.setDate(sinceDate.getDate() - (prefs?.commits_since_days ?? 30));
@@ -118,7 +121,8 @@ export async function POST() {
 
   let postText: string;
   try {
-    postText = await generatePostText(rawLogSummary, language, aiConfig, profileInstructions);
+    postText = await generatePostText(rawLogSummary, language, aiConfig, profileInstructions, toneStyle);
+    postText = applyCustomNDA(postText, customNdaRules ?? null);
   } catch (err) {
     console.error("AI generation error:", err);
     return NextResponse.json(
@@ -181,6 +185,7 @@ export async function POST() {
       status: "pending",
       repos_used: repos.map((r) => r.alias),
       model_used: `${aiProvider}/${aiModel}`,
+      hashtags: extractHashtags(postText),
     })
     .select()
     .single();

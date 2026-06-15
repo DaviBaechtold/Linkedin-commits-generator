@@ -6,6 +6,7 @@ import { generateImage, type ImageConfig } from "@/lib/image";
 import { getDefaultModel, type AIProvider } from "@/lib/ai-providers";
 import type { ImageProvider } from "@/lib/image-providers";
 import { decryptToken } from "@/lib/crypto";
+import { applyCustomNDA, extractHashtags } from "@/lib/nda";
 
 export const maxDuration = 60;
 
@@ -46,13 +47,15 @@ export async function POST(
   if (type === "text") {
     const { data: prefs } = await service
       .from("user_preferences")
-      .select("post_language,ai_provider,ai_model,profile_instructions")
+      .select("post_language,ai_provider,ai_model,profile_instructions,tone_style,nda_custom_rules")
       .eq("user_id", user.id)
       .maybeSingle();
 
     const aiProvider = ((prefs?.ai_provider as AIProvider) ?? "gemini") as AIProvider;
     const aiModel = (prefs?.ai_model as string) ?? getDefaultModel(aiProvider);
     const profileInstructions = (prefs?.profile_instructions as string | undefined) ?? undefined;
+    const toneStyle = (prefs?.tone_style as string | undefined) ?? "balanced";
+    const customNdaRules = (prefs?.nda_custom_rules as string | undefined) ?? undefined;
     const language = prefs?.post_language ?? "pt-BR";
 
     const { data: aiIntegration } = await service
@@ -74,16 +77,18 @@ export async function POST(
 
     const aiConfig: AIConfig = { provider: aiProvider, model: aiModel, apiKey: aiApiKey };
 
-    const newText = await generatePostText(
+    let newText = await generatePostText(
       draft.raw_log_summary ?? draft.post_text,
       language,
       aiConfig,
-      profileInstructions
+      profileInstructions,
+      toneStyle
     );
+    newText = applyCustomNDA(newText, customNdaRules ?? null);
 
     const { data: updated } = await service
       .from("drafts")
-      .update({ post_text: newText, status: "pending" })
+      .update({ post_text: newText, status: "pending", hashtags: extractHashtags(newText) })
       .eq("id", id)
       .eq("user_id", user.id)
       .select()
