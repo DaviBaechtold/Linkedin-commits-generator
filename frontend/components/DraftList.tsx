@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect, useMemo, useRef } from "react";
+import { useState, useTransition, useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { Draft } from "@/lib/supabase/types";
 import DraftFilters, { type DraftFilter } from "./DraftFilters";
 import {
@@ -24,6 +24,9 @@ import {
   MessageCircle,
   Database,
   Cpu,
+  GitBranch,
+  Inbox,
+  CalendarCheck,
 } from "lucide-react";
 
 interface Props {
@@ -31,11 +34,30 @@ interface Props {
 }
 
 const EMPTY_COPY: Record<DraftFilter, { title: string; sub: string }> = {
-  all: { title: "Nenhum rascunho ainda.", sub: 'Clique em "Gerar post" para começar.' },
-  pending: { title: "Nenhum rascunho pendente.", sub: "Gere um post novo para revisar." },
-  posted: { title: "Nenhum post publicado ainda.", sub: "Publique um rascunho para vê-lo aqui." },
-  scheduled: { title: "Nenhum post agendado.", sub: "Ative o auto-post nas Configurações." },
+  all: {
+    title: "Nenhum rascunho ainda",
+    sub: 'Use o botão "Gerar post" acima para criar seu primeiro post a partir dos commits.',
+  },
+  pending: {
+    title: "Nenhum rascunho pendente",
+    sub: "Gere um novo post para revisar aqui.",
+  },
+  posted: {
+    title: "Nenhum post publicado",
+    sub: "Publique um rascunho e ele aparecerá aqui com métricas de engajamento.",
+  },
+  scheduled: {
+    title: "Nenhum post agendado",
+    sub: "Ative o auto-post nas Configurações para gerar e agendar posts automaticamente.",
+  },
 };
+
+function EmptyIcon({ filter }: { filter: DraftFilter }) {
+  if (filter === "all") return <GitBranch className="h-8 w-8 text-brand/60" />;
+  if (filter === "posted") return <CalendarCheck className="h-8 w-8 text-white/20" />;
+  if (filter === "scheduled") return <Clock className="h-8 w-8 text-white/20" />;
+  return <Inbox className="h-8 w-8 text-white/20" />;
+}
 
 export default function DraftList({ initialDrafts }: Props) {
   const [drafts, setDrafts] = useState(initialDrafts);
@@ -83,13 +105,20 @@ export default function DraftList({ initialDrafts }: Props) {
         <div className="rounded-xl border border-dashed border-white/10 py-16 text-center">
           {search.trim() ? (
             <p className="text-sm text-white/30">
-              Nada encontrado para “{search.trim()}”.
+              Nada encontrado para &ldquo;{search.trim()}&rdquo;.
             </p>
           ) : (
-            <>
-              <p className="text-sm text-white/30">{EMPTY_COPY[filter].title}</p>
-              <p className="mt-1 text-xs text-white/20">{EMPTY_COPY[filter].sub}</p>
-            </>
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.03]">
+                <EmptyIcon filter={filter} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white/40">{EMPTY_COPY[filter].title}</p>
+                <p className="mt-1 max-w-xs text-xs leading-relaxed text-white/20">
+                  {EMPTY_COPY[filter].sub}
+                </p>
+              </div>
+            </div>
           )}
         </div>
       ) : (
@@ -463,6 +492,19 @@ function DraftCard({
             onChange={(e) => setEditText(e.target.value)}
             autoFocus
           />
+          <div className="mt-1 flex justify-end">
+            <span
+              className={`text-[11px] tabular-nums ${
+                editText.length > 3000
+                  ? "text-red-400"
+                  : editText.length > 2700
+                  ? "text-amber-400"
+                  : "text-white/25"
+              }`}
+            >
+              {editText.length} / 3000
+            </span>
+          </div>
           <div className="mt-2 flex gap-2">
             <button onClick={saveEdit} disabled={savingEdit} className="btn-primary text-xs py-1.5">
               <Check className="h-3.5 w-3.5" />
