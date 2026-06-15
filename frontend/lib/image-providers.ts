@@ -43,4 +43,6 @@ export const IMAGE_PROVIDERS: Record<ImageProvider, ImageProviderInfo> = {
   },
 };
 
-export const IMAGE_PROVIDER_LIST = Object.keys(IMAGE_PROVIDERS) as ImageProvider[];
+// Lista selecionável na UI — Pollinations fica de fora (descontinuado/pago),
+// mas permanece no type/map p/ compatibilidade com valores já salvos.
+export const IMAGE_PROVIDER_LIST: ImageProvider[] = ["cloudflare", "dalle", "fal"];

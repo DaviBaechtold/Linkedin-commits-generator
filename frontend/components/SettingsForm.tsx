@@ -43,7 +43,9 @@ export default function SettingsForm({
     post_language: preferences?.post_language ?? "pt-BR",
     enable_images: preferences?.enable_images ?? true,
     image_style: preferences?.image_style ?? "professional",
-    image_provider: (preferences?.image_provider ?? "pollinations") as ImageProvider,
+    image_provider: (preferences?.image_provider === "pollinations" || !preferences?.image_provider
+      ? "cloudflare"
+      : preferences.image_provider) as ImageProvider,
     commits_since_days: preferences?.commits_since_days ?? 30,
   });
   const [saving, setSaving] = useState(false);
@@ -222,7 +224,7 @@ export default function SettingsForm({
       await fetch("/api/integrations/ai/fal", { method: "DELETE" });
       setFalKeyHint(null);
       if (prefs.image_provider === "fal") {
-        setPrefs((p) => ({ ...p, image_provider: "pollinations" }));
+        setPrefs((p) => ({ ...p, image_provider: "cloudflare" }));
       }
     } finally {
       setFalKeySaving(false);
@@ -260,7 +262,7 @@ export default function SettingsForm({
       await fetch("/api/integrations/ai/cloudflare", { method: "DELETE" });
       setCfKeyHint(null);
       if (prefs.image_provider === "cloudflare") {
-        setPrefs((p) => ({ ...p, image_provider: "pollinations" }));
+        setPrefs((p) => ({ ...p, image_provider: "cloudflare" }));
       }
     } finally {
       setCfKeySaving(false);

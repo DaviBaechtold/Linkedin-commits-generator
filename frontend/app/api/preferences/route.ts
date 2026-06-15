@@ -12,7 +12,7 @@ export async function PUT(request: NextRequest) {
   const body = await request.json();
 
   const VALID_PROVIDERS = ["gemini", "openai", "anthropic", "deepseek"];
-  const VALID_IMAGE_PROVIDERS = ["pollinations", "dalle", "fal"];
+  const VALID_IMAGE_PROVIDERS = ["cloudflare", "pollinations", "dalle", "fal"];
 
   const allowed = [
     "post_language",
