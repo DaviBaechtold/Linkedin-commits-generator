@@ -21,7 +21,7 @@ export default async function ReposPage() {
   const ghIntegration = ghIntegrationRaw as { provider_username: string | null } | null;
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-4xl">
       <div className="mb-6">
         <h1 className="text-lg font-semibold text-white">Repositórios</h1>
         <p className="mt-1 text-sm text-white/40">

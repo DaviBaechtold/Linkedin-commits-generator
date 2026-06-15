@@ -22,6 +22,8 @@ import {
   Sparkles,
   Heart,
   MessageCircle,
+  Database,
+  Cpu,
 } from "lucide-react";
 
 interface Props {
@@ -473,6 +475,24 @@ function DraftCard({
         >
           {draft.post_text}
         </p>
+      )}
+
+      {/* Insights de geração */}
+      {expanded && !editing && ((draft.repos_used?.length ?? 0) > 0 || draft.model_used) && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/30">
+          {(draft.repos_used?.length ?? 0) > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <Database className="h-3 w-3" />
+              {draft.repos_used!.join(", ")}
+            </span>
+          )}
+          {draft.model_used && (
+            <span className="inline-flex items-center gap-1">
+              <Cpu className="h-3 w-3" />
+              {draft.model_used}
+            </span>
+          )}
+        </div>
       )}
 
       {/* Images */}

@@ -283,54 +283,74 @@ export default function RepoManager({ initialRepos, githubUsername }: Props) {
       {repos.length === 0 ? (
         <div className="rounded-xl border border-dashed border-white/10 py-12 text-center">
           <p className="text-sm text-white/30">Nenhum repositório ainda.</p>
+          <p className="mt-1 text-xs text-white/20">
+            Importe do GitHub ou adicione manualmente para gerar posts.
+          </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
-          {repos.map((repo) => (
-            <div
-              key={repo.id}
-              className={`card flex items-center gap-3 ${
-                !repo.enabled ? "opacity-50" : ""
-              }`}
-            >
-              <div className="flex-1 min-w-0">
-                <p className="truncate text-sm font-medium text-white/80">
-                  {repo.display_name}
-                </p>
-                {repo.github_full_name && (
-                  <p className="truncate text-xs text-white/30">
-                    {repo.github_full_name}
-                  </p>
-                )}
+        <>
+          <div className="flex items-center justify-between px-0.5">
+            <p className="text-xs text-white/30">
+              {repos.length} repositório{repos.length > 1 ? "s" : ""} ·{" "}
+              {repos.filter((r) => r.enabled).length} ativo
+              {repos.filter((r) => r.enabled).length !== 1 ? "s" : ""}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {repos.map((repo) => (
+              <div
+                key={repo.id}
+                className={`card flex flex-col gap-3 transition-opacity ${
+                  !repo.enabled ? "opacity-55" : ""
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <Github className="mt-0.5 h-4 w-4 shrink-0 text-white/30" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-white/85">
+                        {repo.display_name}
+                      </p>
+                      <p className="truncate text-xs text-white/30">
+                        {repo.github_full_name ?? "manual"}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => toggleRepo(repo.id, !repo.enabled)}
+                    className="shrink-0 text-white/30 hover:text-white/70"
+                    title={repo.enabled ? "Desativar" : "Ativar"}
+                  >
+                    {repo.enabled ? (
+                      <ToggleRight className="h-5 w-5 text-brand-light" />
+                    ) : (
+                      <ToggleLeft className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1">
+                    <label className="mb-1 block text-[11px] text-white/40">
+                      Alias público <span className="text-white/20">(aparece nos posts)</span>
+                    </label>
+                    <AliasInput
+                      defaultValue={repo.alias}
+                      onBlur={(val) => updateAlias(repo.id, val)}
+                    />
+                  </div>
+                  <button
+                    onClick={() => deleteRepo(repo.id)}
+                    className="mb-0.5 shrink-0 rounded-lg border border-white/10 p-1.5 text-white/25 transition-colors hover:border-red-500/40 hover:text-red-400"
+                    title="Remover"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-
-              <AliasInput
-                defaultValue={repo.alias}
-                onBlur={(val) => updateAlias(repo.id, val)}
-              />
-
-              <button
-                onClick={() => toggleRepo(repo.id, !repo.enabled)}
-                className="text-white/30 hover:text-white/70"
-                title={repo.enabled ? "Desativar" : "Ativar"}
-              >
-                {repo.enabled ? (
-                  <ToggleRight className="h-5 w-5 text-brand-light" />
-                ) : (
-                  <ToggleLeft className="h-5 w-5" />
-                )}
-              </button>
-
-              <button
-                onClick={() => deleteRepo(repo.id)}
-                className="text-white/20 hover:text-red-400"
-                title="Remover"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -346,7 +366,7 @@ function AliasInput({
   const [val, setVal] = useState(defaultValue);
   return (
     <input
-      className="w-28 rounded border border-white/5 bg-transparent px-2 py-1 text-xs text-white/50 focus:border-brand focus:outline-none focus:text-white/80"
+      className="w-full rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white/70 outline-none transition-colors focus:border-brand focus:text-white"
       value={val}
       onChange={(e) => setVal(e.target.value)}
       onBlur={() => onBlur(val)}
