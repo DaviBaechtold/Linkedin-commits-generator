@@ -243,20 +243,32 @@ function DraftCard({
     setImgBusy(true);
     if (!expanded) setExpanded(true);
     try {
+      // Comprime/redimensiona no cliente — evita o limite de 4.5MB de body da
+      // Vercel e deixa a imagem leve para o LinkedIn.
+      const blob = await compressImage(file);
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", new File([blob], "image.jpg", { type: "image/jpeg" }));
       const res = await fetch(`/api/drafts/${draft.id}/image`, {
         method: "POST",
         body: fd,
       });
-      const json = await res.json();
       if (!res.ok) {
-        setError(json.error ?? "Falha ao anexar imagem.");
+        let msg = "Falha ao anexar imagem.";
+        if (res.status === 413) msg = "Imagem muito grande mesmo após compressão. Tente outra.";
+        else {
+          try {
+            const j = await res.json();
+            msg = j.error ?? msg;
+          } catch {
+            /* resposta não-JSON */
+          }
+        }
+        setError(msg);
         return;
       }
-      onUpdate(json);
+      onUpdate(await res.json());
     } catch {
-      setError("Erro de conexão ao enviar imagem.");
+      setError("Não foi possível processar a imagem. Tente outro arquivo.");
     } finally {
       setImgBusy(false);
     }
@@ -729,6 +741,48 @@ function DraftCard({
       )}
     </div>
   );
+}
+
+/** Redimensiona (máx 1600px) e re-encoda em JPEG no navegador. */
+async function compressImage(file: File): Promise<Blob> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new window.Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("image load failed"));
+    el.src = dataUrl;
+  });
+
+  const maxDim = 1600;
+  let width = img.width;
+  let height = img.height;
+  if (width > maxDim || height > maxDim) {
+    const scale = maxDim / Math.max(width, height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas unsupported");
+  ctx.fillStyle = "#ffffff"; // fundo p/ imagens com transparência
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(img, 0, 0, width, height);
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("compress failed"))),
+      "image/jpeg",
+      0.85
+    );
+  });
 }
 
 function DraftImage({ url }: { url: string }) {
