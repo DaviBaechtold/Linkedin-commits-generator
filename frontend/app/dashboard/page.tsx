@@ -53,7 +53,7 @@ export default async function DashboardPage() {
     supabase
       .from("integrations")
       .select("id")
-      .in("provider", ["gemini", "openai", "anthropic", "deepseek"])
+      .in("provider", ["gemini", "openai", "anthropic", "deepseek", "groq", "mistral", "xai"])
       .limit(1),
     supabase.from("drafts").select("likes_count,comments_count").eq("status", "posted"),
   ]);

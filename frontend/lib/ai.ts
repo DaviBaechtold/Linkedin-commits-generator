@@ -135,6 +135,13 @@ async function generateWithOpenAI(
   return text.trim();
 }
 
+const OPENAI_COMPAT_URLS: Partial<Record<string, string>> = {
+  deepseek: "https://api.deepseek.com",
+  groq: "https://api.groq.com/openai/v1",
+  mistral: "https://api.mistral.ai/v1",
+  xai: "https://api.x.ai/v1",
+};
+
 export async function generatePostText(
   rawLog: string,
   language: string,
@@ -154,10 +161,15 @@ export async function generatePostText(
       text = await generateWithAnthropic(safeLog, language, config.apiKey, config.model, profileInstructions);
       break;
     case "openai":
-      text = await generateWithOpenAI(safeLog, language, config.apiKey, config.model, undefined, profileInstructions);
-      break;
     case "deepseek":
-      text = await generateWithOpenAI(safeLog, language, config.apiKey, config.model, "https://api.deepseek.com", profileInstructions);
+    case "groq":
+    case "mistral":
+    case "xai":
+      text = await generateWithOpenAI(
+        safeLog, language, config.apiKey, config.model,
+        OPENAI_COMPAT_URLS[config.provider],
+        profileInstructions
+      );
       break;
     default:
       throw new Error(`Provider desconhecido: ${(config as AIConfig).provider}`);

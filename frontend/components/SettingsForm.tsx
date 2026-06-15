@@ -68,24 +68,36 @@ export default function SettingsForm({
     anthropic: "",
     openai: "",
     deepseek: "",
+    groq: "",
+    mistral: "",
+    xai: "",
   });
   const [keySaving, setKeySaving] = useState<Record<AIProvider, boolean>>({
     gemini: false,
     anthropic: false,
     openai: false,
     deepseek: false,
+    groq: false,
+    mistral: false,
+    xai: false,
   });
   const [keyHints, setKeyHints] = useState<Record<AIProvider, string | null>>({
     gemini: aiKeyHints["gemini"] ?? null,
     anthropic: aiKeyHints["anthropic"] ?? null,
     openai: aiKeyHints["openai"] ?? null,
     deepseek: aiKeyHints["deepseek"] ?? null,
+    groq: aiKeyHints["groq"] ?? null,
+    mistral: aiKeyHints["mistral"] ?? null,
+    xai: aiKeyHints["xai"] ?? null,
   });
   const [keyErrors, setKeyErrors] = useState<Record<AIProvider, string | null>>({
     gemini: null,
     anthropic: null,
     openai: null,
     deepseek: null,
+    groq: null,
+    mistral: null,
+    xai: null,
   });
 
   // Auto-post

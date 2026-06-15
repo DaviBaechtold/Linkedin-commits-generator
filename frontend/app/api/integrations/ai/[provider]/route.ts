@@ -7,15 +7,22 @@ export const maxDuration = 30;
 
 type AnyProvider = AIProvider | "fal" | "cloudflare";
 
-const VALID_PROVIDERS: AnyProvider[] = ["gemini", "openai", "anthropic", "deepseek", "fal", "cloudflare"];
+const VALID_PROVIDERS: AnyProvider[] = [
+  "gemini", "openai", "anthropic", "deepseek",
+  "groq", "mistral", "xai",
+  "fal", "cloudflare",
+];
 
 const KEY_PREFIXES: Record<AnyProvider, string> = {
   gemini: "AIza",
   anthropic: "sk-ant-",
   openai: "sk-",
   deepseek: "sk-",
-  fal: "", // Fal.ai keys have no standard prefix
-  cloudflare: "", // Cloudflare tokens have no standard prefix
+  groq: "gsk_",
+  mistral: "", // Mistral keys have no standard prefix
+  xai: "xai-",
+  fal: "",
+  cloudflare: "",
 };
 
 /** Tenta auto-detectar o account id (só funciona se o token tiver permissão de listar contas). */

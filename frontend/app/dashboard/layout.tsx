@@ -18,7 +18,7 @@ export default async function DashboardLayout({
     supabase
       .from("integrations")
       .select("id")
-      .in("provider", ["gemini", "openai", "anthropic", "deepseek"])
+      .in("provider", ["gemini", "openai", "anthropic", "deepseek", "groq", "mistral", "xai"])
       .limit(1),
     supabase.from("repos").select("id").limit(1),
     supabase.from("user_preferences").select("*").eq("user_id", user.id).maybeSingle(),
