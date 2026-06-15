@@ -58,7 +58,18 @@ export async function POST() {
   sinceDate.setDate(sinceDate.getDate() - (prefs?.commits_since_days ?? 30));
   const enableImages = prefs?.enable_images ?? true;
   const imageStyle = prefs?.image_style ?? "professional";
-  const imageProvider = ((prefs?.image_provider as ImageProvider) ?? "pollinations") as ImageProvider;
+  let imageProvider = ((prefs?.image_provider as ImageProvider) ?? "pollinations") as ImageProvider;
+
+  // Pollinations descontinuado: cai p/ Cloudflare se o usuário já configurou.
+  if (imageProvider === "pollinations") {
+    const { data: cf } = await service
+      .from("integrations")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("provider", "cloudflare")
+      .maybeSingle();
+    if (cf) imageProvider = "cloudflare";
+  }
 
   const { data: aiIntegration } = await service
     .from("integrations")

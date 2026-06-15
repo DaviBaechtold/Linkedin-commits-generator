@@ -101,7 +101,19 @@ export async function POST(
     .maybeSingle();
 
   const imageStyle = prefs?.image_style ?? "professional";
-  const imageProvider = ((prefs?.image_provider as ImageProvider) ?? "pollinations") as ImageProvider;
+  let imageProvider = ((prefs?.image_provider as ImageProvider) ?? "pollinations") as ImageProvider;
+
+  // Pollinations foi descontinuado. Se a preferência ainda aponta p/ ele mas o
+  // usuário já configurou Cloudflare, usa Cloudflare automaticamente.
+  if (imageProvider === "pollinations") {
+    const { data: cf } = await service
+      .from("integrations")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("provider", "cloudflare")
+      .maybeSingle();
+    if (cf) imageProvider = "cloudflare";
+  }
 
   let imageApiKey: string | undefined;
   let imageAccountId: string | undefined;
