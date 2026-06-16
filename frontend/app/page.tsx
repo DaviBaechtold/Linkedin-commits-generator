@@ -90,52 +90,19 @@ export default function LandingPage() {
   const features = useReveal();
   const flow = useReveal();
   const [chipsIn, setChipsIn] = useState(false);
-  const vantaRef = useRef<HTMLDivElement>(null);
-  const vantaEffect = useRef<{ destroy: () => void } | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setChipsIn(true), 500);
     return () => clearTimeout(t);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function initVanta() {
-      const [THREE, VantaModule] = await Promise.all([
-        import("three"),
-        import("vanta/dist/vanta.net.min"),
-      ]);
-      if (cancelled || !vantaRef.current) return;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vantaEffect.current = (VantaModule as any).default({
-        el: vantaRef.current,
-        THREE,
-        mouseControls: true,
-        touchControls: true,
-        gyroControls: false,
-        minHeight: 200,
-        minWidth: 200,
-        scale: 1,
-        scaleMobile: 1,
-        color: 0x456ae1,
-        backgroundColor: 0x2b2631,
-        points: 20,
-        maxDistance: 21,
-        showDots: true,
-        spacing: 15,
-      });
-    }
-    initVanta().catch(() => {});
-    return () => {
-      cancelled = true;
-      vantaEffect.current?.destroy();
-      vantaEffect.current = null;
-    };
-  }, []);
-
   return (
     <>
       <style>{`
+        @keyframes glowPulse {
+          0%,100% { opacity:.55; }
+          50%      { opacity:1;   }
+        }
         @keyframes fadeUp {
           from { opacity:0; transform:translateY(18px); }
           to   { opacity:1; transform:translateY(0);    }
@@ -164,10 +131,18 @@ export default function LandingPage() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-[#2b2631] text-white overflow-x-hidden">
+      <div className="min-h-screen bg-[rgb(10,10,12)] text-white overflow-x-hidden">
 
-        {/* Vanta NET background */}
-        <div ref={vantaRef} aria-hidden className="pointer-events-none fixed inset-0 z-0" />
+        {/* Ambient glow */}
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 z-0"
+          style={{
+            background:
+              "radial-gradient(ellipse 110% 55% at 50% -2%, rgba(10,102,194,.14) 0%, transparent 65%)",
+            animation: "glowPulse 9s ease-in-out infinite",
+          }}
+        />
 
         {/* Nav */}
         <nav className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-[rgb(10,10,12)]/80 backdrop-blur-md">
