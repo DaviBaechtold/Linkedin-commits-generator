@@ -342,8 +342,55 @@ export default function LandingPage() {
         </section>
 
         {/* Footer */}
-        <footer className="relative z-10 border-t border-white/[0.06] py-6 text-center text-xs text-white/18">
-          CommitPost — geração responsável de conteúdo profissional
+        <footer className="relative z-10 border-t border-white/[0.06] bg-white/[0.01]">
+          <div className="mx-auto max-w-5xl px-4 py-12 grid grid-cols-1 gap-10 sm:grid-cols-2">
+
+            {/* Sobre o projeto */}
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/30">
+                Sobre o projeto
+              </p>
+              <p className="text-sm leading-relaxed text-white/50">
+                O CommitPost nasceu da vontade de transformar commits do dia a dia em presença
+                profissional no LinkedIn — sem precisar escrever nada do zero. Traz sua própria
+                chave de IA, filtra dados sensíveis e publica com revisão antes de qualquer post.
+              </p>
+              <a
+                href="https://github.com/DaviBaechtold/Linkedin-commits-generator"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand-light hover:underline"
+              >
+                <GitBranch className="h-3.5 w-3.5" />
+                Ver no GitHub — 100% open source
+              </a>
+            </div>
+
+            {/* Sobre mim */}
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/30">
+                Sobre mim
+              </p>
+              <p className="text-sm leading-relaxed text-white/50">
+                Sou estudante de Engenharia de Computação e faço software, sites e projetos de
+                hardware por hobby e vontade de aprender. Tudo que construo é gratuito e open
+                source — acredito que conhecimento cresce quando é compartilhado.
+              </p>
+              <a
+                href="https://davicampos.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand-light hover:underline"
+              >
+                <ArrowRight className="h-3.5 w-3.5" />
+                davicampos.dev
+              </a>
+            </div>
+
+          </div>
+          <div className="border-t border-white/[0.05] py-5 text-center text-xs text-white/18">
+            CommitPost — geração responsável de conteúdo profissional
+          </div>
         </footer>
       </div>
     </>
