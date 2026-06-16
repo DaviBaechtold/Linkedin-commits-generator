@@ -85,17 +85,6 @@ function useReveal(threshold = 0.12) {
   return { ref, on };
 }
 
-function loadScript(src: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
-    const s = document.createElement("script");
-    s.src = src;
-    s.onload = () => resolve();
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
-}
-
 export default function LandingPage() {
   const { text, fading } = useCycler(CYCLE);
   const features = useReveal();
@@ -110,14 +99,17 @@ export default function LandingPage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     async function initVanta() {
-      await loadScript("https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js");
-      await loadScript("https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.net.min.js");
+      const [THREE, VantaModule] = await Promise.all([
+        import("three"),
+        import("vanta/dist/vanta.net.min"),
+      ]);
+      if (cancelled || !vantaRef.current) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const w = window as any;
-      if (!vantaRef.current || !w.VANTA) return;
-      vantaEffect.current = w.VANTA.NET({
+      vantaEffect.current = (VantaModule as any).default({
         el: vantaRef.current,
+        THREE,
         mouseControls: true,
         touchControls: true,
         gyroControls: false,
@@ -135,6 +127,7 @@ export default function LandingPage() {
     }
     initVanta().catch(() => {});
     return () => {
+      cancelled = true;
       vantaEffect.current?.destroy();
       vantaEffect.current = null;
     };
