@@ -10,7 +10,7 @@ import {
   ToggleRight,
   Upload,
   Loader2,
-  ChevronDown,
+  ExternalLink,
 } from "lucide-react";
 
 interface GithubRepo {
@@ -301,51 +301,73 @@ export default function RepoManager({ initialRepos, githubUsername }: Props) {
               <div
                 key={repo.id}
                 className={`card flex flex-col gap-3 transition-opacity ${
-                  !repo.enabled ? "opacity-55" : ""
+                  !repo.enabled ? "opacity-50" : ""
                 }`}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 items-start gap-2">
-                    <Github className="mt-0.5 h-4 w-4 shrink-0 text-white/30" />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-white/85">
-                        {repo.display_name}
-                      </p>
-                      <p className="truncate text-xs text-white/30">
-                        {repo.github_full_name ?? "manual"}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => toggleRepo(repo.id, !repo.enabled)}
-                    className="shrink-0 text-white/30 hover:text-white/70"
-                    title={repo.enabled ? "Desativar" : "Ativar"}
-                  >
-                    {repo.enabled ? (
-                      <ToggleRight className="h-5 w-5 text-brand-light" />
-                    ) : (
-                      <ToggleLeft className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-
-                <div className="flex items-end gap-2">
-                  <div className="min-w-0 flex-1">
-                    <label className="mb-1 block text-[11px] text-white/40">
-                      Alias público <span className="text-white/20">(aparece nos posts)</span>
-                    </label>
-                    <AliasInput
-                      defaultValue={repo.alias}
-                      onBlur={(val) => updateAlias(repo.id, val)}
-                    />
+                {/* Header row: toggle + delete */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => toggleRepo(repo.id, !repo.enabled)}
+                      className="shrink-0 text-white/30 hover:text-white/70"
+                      title={repo.enabled ? "Desativar" : "Ativar"}
+                    >
+                      {repo.enabled ? (
+                        <ToggleRight className="h-5 w-5 text-brand-light" />
+                      ) : (
+                        <ToggleLeft className="h-5 w-5" />
+                      )}
+                    </button>
+                    <span
+                      className={`text-[11px] font-medium ${
+                        repo.enabled ? "text-green-400/70" : "text-white/25"
+                      }`}
+                    >
+                      {repo.enabled ? "Ativo" : "Inativo"}
+                    </span>
                   </div>
                   <button
                     onClick={() => deleteRepo(repo.id)}
-                    className="mb-0.5 shrink-0 rounded-lg border border-white/10 p-1.5 text-white/25 transition-colors hover:border-red-500/40 hover:text-red-400"
+                    className="shrink-0 rounded-lg border border-white/10 p-1.5 text-white/25 transition-colors hover:border-red-500/40 hover:text-red-400"
                     title="Remover"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
+                </div>
+
+                {/* Repo identity */}
+                <div className="flex min-w-0 items-start gap-2">
+                  <Github className="mt-0.5 h-4 w-4 shrink-0 text-white/30" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-white/85">
+                      {repo.display_name}
+                    </p>
+                    {repo.github_full_name ? (
+                      <a
+                        href={`https://github.com/${repo.github_full_name}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 truncate text-xs text-white/30 hover:text-brand-light"
+                        title="Abrir no GitHub"
+                      >
+                        {repo.github_full_name}
+                        <ExternalLink className="h-3 w-3 shrink-0" />
+                      </a>
+                    ) : (
+                      <p className="text-xs text-white/25">repositório manual</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Alias */}
+                <div>
+                  <label className="mb-1 block text-[11px] text-white/35">
+                    Nome público nos posts
+                  </label>
+                  <AliasInput
+                    defaultValue={repo.alias}
+                    onBlur={(val) => updateAlias(repo.id, val)}
+                  />
                 </div>
               </div>
             ))}

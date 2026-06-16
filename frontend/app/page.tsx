@@ -103,6 +103,24 @@ export default function LandingPage() {
           0%,100% { opacity:.55; }
           50%      { opacity:1;   }
         }
+        @keyframes orb1 {
+          0%,100% { transform:translate(0px,0px); }
+          33%      { transform:translate(90px,70px); }
+          66%      { transform:translate(-50px,110px); }
+        }
+        @keyframes orb2 {
+          0%,100% { transform:translate(0px,0px); }
+          40%      { transform:translate(-130px,-90px); }
+          80%      { transform:translate(70px,-30px); }
+        }
+        @keyframes orb3 {
+          0%,100% { transform:translate(0px,0px); }
+          50%      { transform:translate(-70px,90px); }
+        }
+        @keyframes gridDrift {
+          0%,100% { transform:translateY(0px); }
+          50%      { transform:translateY(-10px); }
+        }
         @keyframes fadeUp {
           from { opacity:0; transform:translateY(18px); }
           to   { opacity:1; transform:translateY(0);    }
@@ -133,16 +151,43 @@ export default function LandingPage() {
 
       <div className="min-h-screen bg-[rgb(10,10,12)] text-white overflow-x-hidden">
 
-        {/* Ambient glow */}
-        <div
-          aria-hidden
-          className="pointer-events-none fixed inset-0 z-0"
-          style={{
-            background:
-              "radial-gradient(ellipse 110% 55% at 50% -2%, rgba(10,102,194,.14) 0%, transparent 65%)",
-            animation: "glowPulse 9s ease-in-out infinite",
-          }}
-        />
+        {/* Background system */}
+        <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+          {/* Dot grid */}
+          <div style={{
+            position:"absolute", inset:0,
+            backgroundImage:"radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)",
+            backgroundSize:"44px 44px",
+            animation:"gridDrift 20s ease-in-out infinite",
+          }} />
+          {/* Top glow */}
+          <div style={{
+            position:"absolute", inset:0,
+            background:"radial-gradient(ellipse 110% 55% at 50% -2%, rgba(10,102,194,.14) 0%, transparent 65%)",
+            animation:"glowPulse 9s ease-in-out infinite",
+          }} />
+          {/* Orb 1 — blue, top-left */}
+          <div style={{
+            position:"absolute", width:"650px", height:"650px", borderRadius:"50%",
+            background:"radial-gradient(circle, rgba(10,102,194,0.11) 0%, transparent 70%)",
+            top:"-180px", left:"-180px",
+            animation:"orb1 28s ease-in-out infinite",
+          }} />
+          {/* Orb 2 — light blue, bottom-right */}
+          <div style={{
+            position:"absolute", width:"520px", height:"520px", borderRadius:"50%",
+            background:"radial-gradient(circle, rgba(55,143,233,0.07) 0%, transparent 70%)",
+            bottom:"-120px", right:"-120px",
+            animation:"orb2 35s ease-in-out infinite",
+          }} />
+          {/* Orb 3 — purple accent, center-right */}
+          <div style={{
+            position:"absolute", width:"360px", height:"360px", borderRadius:"50%",
+            background:"radial-gradient(circle, rgba(139,92,246,0.07) 0%, transparent 70%)",
+            top:"55%", left:"68%",
+            animation:"orb3 22s ease-in-out infinite",
+          }} />
+        </div>
 
         {/* Nav */}
         <nav className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-[rgb(10,10,12)]/80 backdrop-blur-md">

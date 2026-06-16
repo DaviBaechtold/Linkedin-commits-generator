@@ -382,7 +382,13 @@ export default function SettingsForm({
   const activeProviderInfo = PROVIDERS[aiPrefs.ai_provider as AIProvider];
 
   return (
-    <div className="columns-1 gap-6 lg:columns-2 [&>section]:mb-6 [&>section]:break-inside-avoid">
+    <div className="flex flex-col gap-10">
+
+      {/* ── Integrações ── */}
+      <div>
+        <SettingsGroupHeader title="Integrações" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+
       {/* LinkedIn */}
       <section className="card" data-tutorial="linkedin">
         <h2 className="mb-4 text-sm font-semibold text-white/80">Integração LinkedIn</h2>
@@ -425,6 +431,93 @@ export default function SettingsForm({
           </div>
         )}
       </section>
+
+      {/* Bluesky */}
+      <section className="card flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <Cloud className="h-4 w-4 text-sky-400" />
+          <h2 className="text-sm font-semibold text-white/80">Bluesky</h2>
+        </div>
+        <p className="text-xs text-white/35">
+          Publique posts no Bluesky com um clique. Use uma{" "}
+          <a
+            href="https://bsky.app/settings/app-passwords"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sky-400 hover:underline"
+          >
+            App Password
+          </a>{" "}
+          (nunca sua senha principal).
+        </p>
+
+        {bskyHint ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-400" />
+              <div>
+                <p className="text-sm text-white/80">Conectado</p>
+                <p className="text-xs text-white/40">{bskyHint}</p>
+              </div>
+            </div>
+            <button onClick={removeBluesky} disabled={bskySaving} className="btn-ghost">
+              {bskySaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              Desconectar
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {bskyError && (
+              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">{bskyError}</p>
+            )}
+            <input
+              type="text"
+              className="input"
+              value={bskyHandle}
+              onChange={(e) => setBskyHandle(e.target.value)}
+              placeholder="usuario.bsky.social"
+              autoComplete="off"
+            />
+            <input
+              type="password"
+              className="input"
+              value={bskyPassword}
+              onChange={(e) => setBskyPassword(e.target.value)}
+              placeholder="xxxx-xxxx-xxxx-xxxx"
+              autoComplete="off"
+              onKeyDown={(e) => e.key === "Enter" && saveBluesky()}
+            />
+            <div className="flex items-center justify-between">
+              <a
+                href="https://bsky.app/settings/app-passwords"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-0.5 text-xs text-sky-400 hover:underline"
+              >
+                Criar App Password
+                <ExternalLink className="h-3 w-3" />
+              </a>
+              <button
+                onClick={saveBluesky}
+                disabled={bskySaving || !bskyHandle.trim() || !bskyPassword.trim()}
+                className="btn-primary"
+              >
+                {bskySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Key className="h-4 w-4" />}
+                {bskySaving ? "Validando..." : "Conectar"}
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+
+        </div>{/* end grid integrações */}
+      </div>{/* end group integrações */}
+
+      {/* ── Inteligência Artificial ── */}
+      <div>
+        <SettingsGroupHeader title="Inteligência Artificial" />
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
 
       {/* AI Keys */}
       <section className="card flex flex-col gap-4" data-tutorial="ai-key">
@@ -628,6 +721,8 @@ export default function SettingsForm({
         </div>
       </section>
 
+          </div>{/* end grid IA */}
+
       {/* NDA personalizado */}
       <section className="card flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-white/80">Filtro NDA personalizado</h2>
@@ -658,36 +753,13 @@ export default function SettingsForm({
         </div>
       </section>
 
-      {/* Usage stats */}
-      <section className="card flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <BarChart2 className="h-4 w-4 text-brand-light" />
-          <h2 className="text-sm font-semibold text-white/80">Consumo de API</h2>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-lg bg-white/5 p-3 text-center">
-            <p className="text-2xl font-semibold text-white">{usageStats.today}</p>
-            <p className="mt-0.5 text-xs text-white/35">Hoje</p>
-          </div>
-          <div className="rounded-lg bg-white/5 p-3 text-center">
-            <p className="text-2xl font-semibold text-white">{usageStats.week}</p>
-            <p className="mt-0.5 text-xs text-white/35">Últimos 7 dias</p>
-          </div>
-          <div className="rounded-lg bg-white/5 p-3 text-center">
-            <p className="text-2xl font-semibold text-white">{usageStats.month}</p>
-            <p className="mt-0.5 text-xs text-white/35">Este mês</p>
-          </div>
-        </div>
-        <p className="text-xs text-white/25">Posts gerados via IA. Cada geração usa uma chamada à API do provedor.</p>
-        {connectedProviders.length > 0 && (
-          <p className="text-xs text-white/35">
-            Provedor ativo:{" "}
-            <span className="text-white/60">{PROVIDERS[aiPrefs.ai_provider as AIProvider]?.label}</span>
-            {" · "}
-            <span className="font-mono text-white/40">{aiPrefs.ai_model}</span>
-          </p>
-        )}
-      </section>
+        </div>{/* end flex-col IA */}
+      </div>{/* end group IA */}
+
+      {/* ── Automação ── */}
+      <div>
+        <SettingsGroupHeader title="Automação" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
 
       {/* Auto-post */}
       <section className="card flex flex-col gap-4">
@@ -1048,6 +1120,14 @@ export default function SettingsForm({
         </div>
       </section>
 
+        </div>{/* end grid automação */}
+      </div>{/* end group automação */}
+
+      {/* ── Preferências ── */}
+      <div>
+        <SettingsGroupHeader title="Preferências" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+
       {/* General preferences */}
       <section className="card flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-white/80">Preferências de geração</h2>
@@ -1091,118 +1171,96 @@ export default function SettingsForm({
         </div>
       </section>
 
-      {/* Bluesky */}
-      <section className="card flex flex-col gap-4">
+      {/* Usage stats */}
+      <section className="card flex flex-col gap-3">
         <div className="flex items-center gap-2">
-          <Cloud className="h-4 w-4 text-sky-400" />
-          <h2 className="text-sm font-semibold text-white/80">Bluesky</h2>
+          <BarChart2 className="h-4 w-4 text-brand-light" />
+          <h2 className="text-sm font-semibold text-white/80">Consumo de API</h2>
         </div>
-        <p className="text-xs text-white/35">
-          Publique posts no Bluesky com um clique. Use uma{" "}
-          <a
-            href="https://bsky.app/settings/app-passwords"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sky-400 hover:underline"
-          >
-            App Password
-          </a>{" "}
-          (nunca sua senha principal).
-        </p>
-
-        {bskyHint ? (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-400" />
-              <div>
-                <p className="text-sm text-white/80">Conectado</p>
-                <p className="text-xs text-white/40">{bskyHint}</p>
-              </div>
-            </div>
-            <button onClick={removeBluesky} disabled={bskySaving} className="btn-ghost">
-              {bskySaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              Desconectar
-            </button>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-lg bg-white/5 p-3 text-center">
+            <p className="text-2xl font-semibold text-white">{usageStats.today}</p>
+            <p className="mt-0.5 text-xs text-white/35">Hoje</p>
           </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {bskyError && (
-              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">{bskyError}</p>
-            )}
-            <input
-              type="text"
-              className="input"
-              value={bskyHandle}
-              onChange={(e) => setBskyHandle(e.target.value)}
-              placeholder="usuario.bsky.social"
-              autoComplete="off"
-            />
-            <input
-              type="password"
-              className="input"
-              value={bskyPassword}
-              onChange={(e) => setBskyPassword(e.target.value)}
-              placeholder="xxxx-xxxx-xxxx-xxxx"
-              autoComplete="off"
-              onKeyDown={(e) => e.key === "Enter" && saveBluesky()}
-            />
-            <div className="flex items-center justify-between">
-              <a
-                href="https://bsky.app/settings/app-passwords"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-0.5 text-xs text-sky-400 hover:underline"
-              >
-                Criar App Password
-                <ExternalLink className="h-3 w-3" />
-              </a>
-              <button
-                onClick={saveBluesky}
-                disabled={bskySaving || !bskyHandle.trim() || !bskyPassword.trim()}
-                className="btn-primary"
-              >
-                {bskySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Key className="h-4 w-4" />}
-                {bskySaving ? "Validando..." : "Conectar"}
-              </button>
-            </div>
+          <div className="rounded-lg bg-white/5 p-3 text-center">
+            <p className="text-2xl font-semibold text-white">{usageStats.week}</p>
+            <p className="mt-0.5 text-xs text-white/35">Últimos 7 dias</p>
           </div>
-        )}
-      </section>
-
-      {/* Danger zone */}
-      <section className="card border-red-500/20">
-        <h2 className="mb-1 text-sm font-semibold text-red-400">Zona de perigo</h2>
-        <p className="mb-4 text-xs text-white/40">
-          A exclusão de conta é permanente e irreversível. Todos os seus rascunhos,
-          repositórios e integrações serão deletados imediatamente, conforme a LGPD.
-        </p>
-
-        {deleteError && (
-          <p className="mb-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
-            {deleteError}
+          <div className="rounded-lg bg-white/5 p-3 text-center">
+            <p className="text-2xl font-semibold text-white">{usageStats.month}</p>
+            <p className="mt-0.5 text-xs text-white/35">Este mês</p>
+          </div>
+        </div>
+        <p className="text-xs text-white/25">Posts gerados via IA. Cada geração usa uma chamada à API do provedor.</p>
+        {connectedProviders.length > 0 && (
+          <p className="text-xs text-white/35">
+            Provedor ativo:{" "}
+            <span className="text-white/60">{PROVIDERS[aiPrefs.ai_provider as AIProvider]?.label}</span>
+            {" · "}
+            <span className="font-mono text-white/40">{aiPrefs.ai_model}</span>
           </p>
         )}
-
-        <label className="label text-white/50">
-          Digite <span className="font-mono text-red-400">EXCLUIR</span> para confirmar
-        </label>
-        <input
-          className="input mb-3 max-w-xs"
-          value={deleteConfirm}
-          onChange={(e) => setDeleteConfirm(e.target.value)}
-          placeholder="EXCLUIR"
-          autoComplete="off"
-        />
-
-        <button
-          onClick={deleteAccount}
-          disabled={deleteConfirm !== "EXCLUIR" || deleting}
-          className="btn-danger-outline"
-        >
-          {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-          Excluir minha conta
-        </button>
       </section>
+
+        </div>{/* end grid preferências */}
+      </div>{/* end group preferências */}
+
+      {/* ── Zona de Perigo ── */}
+      <div>
+        <div className="mb-4 flex items-center gap-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-red-500/60">Zona de perigo</p>
+          <div className="h-px flex-1 bg-red-500/15" />
+        </div>
+        <section className="rounded-xl border border-red-500/25 bg-red-950/[0.06] p-6 flex flex-col gap-4">
+          <div>
+            <h2 className="mb-1 text-sm font-semibold text-red-400">Excluir conta</h2>
+            <p className="text-xs text-white/40">
+              A exclusão de conta é permanente e irreversível. Todos os seus rascunhos,
+              repositórios e integrações serão deletados imediatamente, conforme a LGPD.
+            </p>
+          </div>
+
+          {deleteError && (
+            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
+              {deleteError}
+            </p>
+          )}
+
+          <div>
+            <label className="label text-white/50">
+              Digite <span className="font-mono text-red-400">EXCLUIR</span> para confirmar
+            </label>
+            <input
+              className="input mt-1 max-w-xs"
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              placeholder="EXCLUIR"
+              autoComplete="off"
+            />
+          </div>
+
+          <div>
+            <button
+              onClick={deleteAccount}
+              disabled={deleteConfirm !== "EXCLUIR" || deleting}
+              className="btn-danger-outline"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Excluir minha conta
+            </button>
+          </div>
+        </section>
+      </div>
+
+    </div>
+  );
+}
+
+function SettingsGroupHeader({ title }: { title: string }) {
+  return (
+    <div className="mb-4 flex items-center gap-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-white/25">{title}</p>
+      <div className="h-px flex-1 bg-white/[0.06]" />
     </div>
   );
 }
