@@ -723,16 +723,22 @@ function DraftCard({
 
       {/* Insights de geração */}
       {expanded && !editing && ((draft.repos_used?.length ?? 0) > 0 || draft.model_used) && (
-        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/30">
-          {(draft.repos_used?.length ?? 0) > 0 && (
-            <span className="inline-flex items-center gap-1">
-              <Database className="h-3 w-3" />
-              {draft.repos_used!.join(", ")}
-            </span>
-          )}
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/30">
+          {(draft.repos_used?.length ?? 0) > 0 && (() => {
+            const repos = draft.repos_used!;
+            const shown = repos.slice(0, 3);
+            const extra = repos.length - shown.length;
+            return (
+              <span className="inline-flex items-center gap-1">
+                <Database className="h-3 w-3 shrink-0" />
+                {shown.join(", ")}
+                {extra > 0 && <span className="ml-0.5 text-white/20">+{extra} mais</span>}
+              </span>
+            );
+          })()}
           {draft.model_used && (
             <span className="inline-flex items-center gap-1">
-              <Cpu className="h-3 w-3" />
+              <Cpu className="h-3 w-3 shrink-0" />
               {draft.model_used}
             </span>
           )}
