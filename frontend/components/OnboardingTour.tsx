@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { X, ArrowRight } from "lucide-react";
 
@@ -385,13 +385,28 @@ function Tooltip({
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
+  // Mede a altura real do tooltip para garantir que ele nunca seja cortado —
+  // alvos altos (cards de seção) empurravam o tooltip pra fora da viewport.
+  const ref = useRef<HTMLDivElement>(null);
+  const [h, setH] = useState(200);
+  useLayoutEffect(() => {
+    if (ref.current) setH(ref.current.offsetHeight);
+  }, [step, rect]);
+
   const spaceBelow = vh - rect.bottom - GAP;
   const spaceAbove = rect.top - GAP;
 
-  const top =
-    spaceBelow >= 150 || spaceBelow >= spaceAbove
-      ? rect.bottom + GAP + 10
-      : rect.top - GAP - 10 - 170;
+  let top: number;
+  if (spaceBelow >= h + MARGIN) {
+    top = rect.bottom + GAP; // cabe abaixo do alvo
+  } else if (spaceAbove >= h + MARGIN) {
+    top = rect.top - GAP - h; // cabe acima do alvo
+  } else {
+    // Alvo alto demais (maior que a viewport): centraliza verticalmente.
+    top = (vh - h) / 2;
+  }
+  // Clamp final — sempre 100% visível.
+  top = Math.max(MARGIN, Math.min(top, vh - h - MARGIN));
 
   let left = rect.left + rect.width / 2 - W / 2;
   left = Math.max(MARGIN, Math.min(vw - W - MARGIN, left));
@@ -400,6 +415,7 @@ function Tooltip({
 
   return (
     <div
+      ref={ref}
       className="fixed z-[99999] flex flex-col gap-4 rounded-xl border p-5 shadow-2xl"
       style={{
         top,
