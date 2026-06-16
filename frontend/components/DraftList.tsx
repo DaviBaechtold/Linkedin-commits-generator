@@ -71,6 +71,16 @@ export default function DraftList({ initialDrafts, userName = "Você", userAvata
   const [filter, setFilter] = useState<DraftFilter>("all");
   const [search, setSearch] = useState("");
 
+  // Sync novos rascunhos quando o servidor re-renderiza (ex: após router.refresh())
+  useEffect(() => {
+    setDrafts((prev) => {
+      const prevIds = new Set(prev.map((d) => d.id));
+      const fresh = initialDrafts.filter((d) => !prevIds.has(d.id));
+      if (fresh.length === 0) return prev;
+      return [...fresh, ...prev];
+    });
+  }, [initialDrafts]);
+
   function updateDraft(updated: Draft) {
     setDrafts((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
   }
