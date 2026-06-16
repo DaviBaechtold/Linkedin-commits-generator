@@ -20,6 +20,15 @@ export default async function DashboardPage() {
 
   const head = { count: "exact" as const, head: true };
 
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+  const userName =
+    (authUser?.user_metadata?.full_name as string | undefined) ??
+    (authUser?.user_metadata?.user_name as string | undefined) ??
+    "Você";
+  const userAvatar = (authUser?.user_metadata?.avatar_url as string | undefined) ?? null;
+
   const [
     draftsResult,
     postedCount,
@@ -32,6 +41,7 @@ export default async function DashboardPage() {
     reposResult,
     aiResult,
     engagementResult,
+    blueskyResult,
   ] = await Promise.all([
     supabase.from("drafts").select("*").order("created_at", { ascending: false }).limit(20),
     supabase.from("drafts").select("id", head).eq("status", "posted"),
@@ -56,10 +66,12 @@ export default async function DashboardPage() {
       .in("provider", ["gemini", "openai", "anthropic", "deepseek", "groq", "mistral", "xai"])
       .limit(1),
     supabase.from("drafts").select("likes_count,comments_count").eq("status", "posted"),
+    supabase.from("integrations").select("id").eq("provider", "bluesky").maybeSingle(),
   ]);
 
   const drafts = (draftsResult.data ?? []) as Draft[];
   const hasLinkedIn = !!linkedinResult.data;
+  const blueskyConnected = !!blueskyResult.data;
   const hasRepos = (reposResult.data?.length ?? 0) > 0;
   const hasAI = (aiResult.data?.length ?? 0) > 0;
 
@@ -157,7 +169,12 @@ export default async function DashboardPage() {
 
       {/* Lista + coluna lateral */}
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <DraftList initialDrafts={drafts} />
+        <DraftList
+          initialDrafts={drafts}
+          userName={userName}
+          userAvatar={userAvatar}
+          blueskyConnected={blueskyConnected}
+        />
         <SideRail
           activity={activity}
           topRepos={topRepos}

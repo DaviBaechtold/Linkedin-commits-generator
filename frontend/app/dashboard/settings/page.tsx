@@ -30,9 +30,9 @@ export default async function SettingsPage() {
         .maybeSingle(),
       service
         .from("integrations")
-        .select("provider,access_token")
+        .select("provider,access_token,provider_username")
         .eq("user_id", user.id)
-        .in("provider", ["gemini", "openai", "anthropic", "deepseek", "groq", "mistral", "xai", "fal", "cloudflare"]),
+        .in("provider", ["gemini", "openai", "anthropic", "deepseek", "groq", "mistral", "xai", "fal", "cloudflare", "bluesky"]),
       service
         .from("usage_logs")
         .select("id", { count: "exact", head: true })
@@ -65,11 +65,17 @@ export default async function SettingsPage() {
 
   const aiKeyHints: Record<string, string | null> = {};
   for (const row of aiKeysResult.data ?? []) {
-    const stored = (row as { provider: string; access_token: string }).access_token;
+    const stored = (row as { provider: string; access_token: string; provider_username: string | null }).access_token;
     const provider = (row as { provider: string }).provider;
-    // Decifra para mostrar o hint dos últimos 4 chars da chave REAL (não do ciphertext).
-    const token = stored ? decryptToken(stored) : "";
-    aiKeyHints[provider] = token ? `...${token.slice(-4)}` : null;
+    const username = (row as { provider_username: string | null }).provider_username;
+    if (provider === "bluesky") {
+      // For Bluesky, show the handle instead of key hint
+      aiKeyHints[provider] = username ? `@${username}` : "conectado";
+    } else {
+      // Decifra para mostrar o hint dos últimos 4 chars da chave REAL (não do ciphertext).
+      const token = stored ? decryptToken(stored) : "";
+      aiKeyHints[provider] = token ? `...${token.slice(-4)}` : null;
+    }
   }
 
   const usageStats = {

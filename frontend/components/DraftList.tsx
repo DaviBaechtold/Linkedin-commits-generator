@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { Draft } from "@/lib/supabase/types";
 import DraftFilters, { type DraftFilter } from "./DraftFilters";
+import PostPreviewModal from "./PostPreviewModal";
 import {
   Check,
   X,
@@ -27,10 +28,16 @@ import {
   GitBranch,
   Inbox,
   CalendarCheck,
+  Eye,
+  Calendar,
+  Cloud,
 } from "lucide-react";
 
 interface Props {
   initialDrafts: Draft[];
+  userName?: string;
+  userAvatar?: string | null;
+  blueskyConnected?: boolean;
 }
 
 const EMPTY_COPY: Record<DraftFilter, { title: string; sub: string }> = {
@@ -59,7 +66,7 @@ function EmptyIcon({ filter }: { filter: DraftFilter }) {
   return <Inbox className="h-8 w-8 text-white/20" />;
 }
 
-export default function DraftList({ initialDrafts }: Props) {
+export default function DraftList({ initialDrafts, userName = "Você", userAvatar = null, blueskyConnected = false }: Props) {
   const [drafts, setDrafts] = useState(initialDrafts);
   const [filter, setFilter] = useState<DraftFilter>("all");
   const [search, setSearch] = useState("");
@@ -128,7 +135,14 @@ export default function DraftList({ initialDrafts }: Props) {
               key={draft.id}
               style={{ animation: `draftIn .4s ${Math.min(i, 8) * 50}ms ease both` }}
             >
-              <DraftCard draft={draft} onUpdate={updateDraft} onDelete={removeDraft} />
+              <DraftCard
+                draft={draft}
+                onUpdate={updateDraft}
+                onDelete={removeDraft}
+                userName={userName}
+                userAvatar={userAvatar}
+                blueskyConnected={blueskyConnected}
+              />
             </div>
           ))}
         </div>
@@ -168,10 +182,16 @@ function DraftCard({
   draft,
   onUpdate,
   onDelete,
+  userName,
+  userAvatar,
+  blueskyConnected,
 }: {
   draft: Draft;
   onUpdate: (d: Draft) => void;
   onDelete: (id: string) => void;
+  userName: string;
+  userAvatar: string | null;
+  blueskyConnected: boolean;
 }) {
   const [expanded, setExpanded] = useState(
     draft.status === "pending" || draft.status === "scheduled"
@@ -184,6 +204,12 @@ function DraftCard({
   const [hashtags, setHashtags] = useState<string[]>(draft.hashtags ?? []);
   const [newTag, setNewTag] = useState("");
   const [addingTag, setAddingTag] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
+  const [scheduleFor, setScheduleFor] = useState("");
+  const [schedulingSaving, setSchedulingSaving] = useState(false);
+  const [bskyPosting, setBskyPosting] = useState(false);
+  const [bskyResult, setBskyResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -389,6 +415,44 @@ function DraftCard({
     }
   }
 
+  async function schedulePost() {
+    if (!scheduleFor) return;
+    setSchedulingSaving(true);
+    setError(null);
+    const res = await fetch(`/api/drafts/${draft.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scheduled_for: scheduleFor }),
+    });
+    const json = await res.json();
+    setSchedulingSaving(false);
+    if (!res.ok) {
+      setError(json.error ?? "Falha ao agendar.");
+      return;
+    }
+    setScheduling(false);
+    setScheduleFor("");
+    onUpdate(json);
+  }
+
+  async function publishToBluesky() {
+    setBskyPosting(true);
+    setBskyResult(null);
+    const res = await fetch(`/api/drafts/${draft.id}/publish-bluesky`, { method: "POST" });
+    const json = await res.json();
+    setBskyPosting(false);
+    if (!res.ok) {
+      setBskyResult({ ok: false, msg: json.error ?? "Falha ao publicar no Bluesky." });
+    } else {
+      setBskyResult({
+        ok: true,
+        msg: json.truncated
+          ? "Publicado no Bluesky (texto truncado para 300 caracteres)."
+          : "Publicado no Bluesky!",
+      });
+    }
+  }
+
   async function updateHashtags(tags: string[]) {
     const res = await fetch(`/api/drafts/${draft.id}`, {
       method: "PATCH",
@@ -478,6 +542,17 @@ function DraftCard({
       tabIndex={isActive ? 0 : undefined}
       onPaste={onPasteImage}
     >
+      {/* Preview modal */}
+      {showPreview && (
+        <PostPreviewModal
+          postText={draft.post_text}
+          visualAssets={draft.visual_assets ?? []}
+          userName={userName}
+          userAvatar={userAvatar}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -497,12 +572,21 @@ function DraftCard({
             })}
           </span>
         </div>
-        <button
-          onClick={() => setExpanded((e) => !e)}
-          className="text-white/30 hover:text-white/60"
-        >
-          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowPreview(true)}
+            title="Pré-visualizar como LinkedIn"
+            className="text-white/25 hover:text-white/60"
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            className="text-white/30 hover:text-white/60"
+          >
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
 
       {/* Scheduled banner */}
@@ -665,6 +749,50 @@ function DraftCard({
         <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">{error}</p>
       )}
 
+      {/* Bluesky result banner */}
+      {bskyResult && (
+        <div
+          className={`mt-3 flex items-center justify-between rounded-lg px-3 py-2 text-xs ${
+            bskyResult.ok
+              ? "bg-sky-500/10 text-sky-300"
+              : "bg-red-500/10 text-red-400"
+          }`}
+        >
+          <span>{bskyResult.msg}</span>
+          <button onClick={() => setBskyResult(null)} className="ml-2 opacity-60 hover:opacity-100">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Scheduling panel */}
+      {scheduling && isActive && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3">
+          <Calendar className="h-4 w-4 shrink-0 text-brand-light" />
+          <input
+            type="datetime-local"
+            className="input flex-1 text-sm"
+            value={scheduleFor}
+            onChange={(e) => setScheduleFor(e.target.value)}
+            min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+          />
+          <button
+            onClick={schedulePost}
+            disabled={schedulingSaving || !scheduleFor}
+            className="btn-primary py-1.5 text-xs"
+          >
+            {schedulingSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+            Confirmar
+          </button>
+          <button
+            onClick={() => { setScheduling(false); setScheduleFor(""); }}
+            className="btn-ghost py-1.5 text-xs"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+
       {/* Actions — pending */}
       {expanded && isActive && !editing && (
         <div className="mt-4 flex flex-wrap gap-2">
@@ -703,6 +831,29 @@ function DraftCard({
             <RefreshCw className="h-4 w-4" />
             Regenerar texto
           </button>
+          <button
+            onClick={() => { setScheduling((s) => !s); setScheduleFor(""); }}
+            disabled={isLoading}
+            className="btn-secondary"
+          >
+            <Calendar className="h-4 w-4" />
+            Agendar
+          </button>
+          {blueskyConnected && (
+            <button
+              onClick={publishToBluesky}
+              disabled={bskyPosting || isLoading}
+              className="btn-secondary"
+              title="Publicar no Bluesky"
+            >
+              {bskyPosting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Cloud className="h-4 w-4" />
+              )}
+              Bluesky
+            </button>
+          )}
           <button
             onClick={() => fileRef.current?.click()}
             disabled={isLoading || imgBusy}

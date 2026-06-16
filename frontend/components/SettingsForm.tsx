@@ -17,6 +17,7 @@ import {
   BarChart2,
   Zap,
   Image,
+  Cloud,
 } from "lucide-react";
 
 interface Props {
@@ -128,6 +129,13 @@ export default function SettingsForm({
   const [cfKeySaving, setCfKeySaving] = useState(false);
   const [cfKeyHint, setCfKeyHint] = useState<string | null>(aiKeyHints["cloudflare"] ?? null);
   const [cfKeyError, setCfKeyError] = useState<string | null>(null);
+
+  // Bluesky
+  const [bskyHandle, setBskyHandle] = useState("");
+  const [bskyPassword, setBskyPassword] = useState("");
+  const [bskySaving, setBskySaving] = useState(false);
+  const [bskyHint, setBskyHint] = useState<string | null>(aiKeyHints["bluesky"] ?? null);
+  const [bskyError, setBskyError] = useState<string | null>(null);
 
   // Danger zone
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -284,6 +292,41 @@ export default function SettingsForm({
       }
     } finally {
       setCfKeySaving(false);
+    }
+  }
+
+  async function saveBluesky() {
+    const handle = bskyHandle.trim().replace(/^@/, "");
+    const password = bskyPassword.trim();
+    if (!handle || !password) return;
+    setBskySaving(true);
+    setBskyError(null);
+    try {
+      const res = await fetch("/api/integrations/bluesky", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle, app_password: password }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setBskyError(json.error ?? "Falha ao conectar Bluesky.");
+        return;
+      }
+      setBskyHint(`@${handle}`);
+      setBskyHandle("");
+      setBskyPassword("");
+    } finally {
+      setBskySaving(false);
+    }
+  }
+
+  async function removeBluesky() {
+    setBskySaving(true);
+    try {
+      await fetch("/api/integrations/bluesky", { method: "DELETE" });
+      setBskyHint(null);
+    } finally {
+      setBskySaving(false);
     }
   }
 
@@ -1046,6 +1089,84 @@ export default function SettingsForm({
           </button>
           {saved && <span className="text-sm text-green-400">Salvo!</span>}
         </div>
+      </section>
+
+      {/* Bluesky */}
+      <section className="card flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <Cloud className="h-4 w-4 text-sky-400" />
+          <h2 className="text-sm font-semibold text-white/80">Bluesky</h2>
+        </div>
+        <p className="text-xs text-white/35">
+          Publique posts no Bluesky com um clique. Use uma{" "}
+          <a
+            href="https://bsky.app/settings/app-passwords"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sky-400 hover:underline"
+          >
+            App Password
+          </a>{" "}
+          (nunca sua senha principal).
+        </p>
+
+        {bskyHint ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-400" />
+              <div>
+                <p className="text-sm text-white/80">Conectado</p>
+                <p className="text-xs text-white/40">{bskyHint}</p>
+              </div>
+            </div>
+            <button onClick={removeBluesky} disabled={bskySaving} className="btn-ghost">
+              {bskySaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              Desconectar
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {bskyError && (
+              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">{bskyError}</p>
+            )}
+            <input
+              type="text"
+              className="input"
+              value={bskyHandle}
+              onChange={(e) => setBskyHandle(e.target.value)}
+              placeholder="usuario.bsky.social"
+              autoComplete="off"
+            />
+            <input
+              type="password"
+              className="input"
+              value={bskyPassword}
+              onChange={(e) => setBskyPassword(e.target.value)}
+              placeholder="xxxx-xxxx-xxxx-xxxx"
+              autoComplete="off"
+              onKeyDown={(e) => e.key === "Enter" && saveBluesky()}
+            />
+            <div className="flex items-center justify-between">
+              <a
+                href="https://bsky.app/settings/app-passwords"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-0.5 text-xs text-sky-400 hover:underline"
+              >
+                Criar App Password
+                <ExternalLink className="h-3 w-3" />
+              </a>
+              <button
+                onClick={saveBluesky}
+                disabled={bskySaving || !bskyHandle.trim() || !bskyPassword.trim()}
+                className="btn-primary"
+              >
+                {bskySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Key className="h-4 w-4" />}
+                {bskySaving ? "Validando..." : "Conectar"}
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Danger zone */}

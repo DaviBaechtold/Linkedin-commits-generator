@@ -22,6 +22,7 @@ export async function PATCH(
     status?: ValidStatus;
     post_text?: string;
     hashtags?: string[];
+    scheduled_for?: string | null;
   } = {};
 
   if (body.status !== undefined) {
@@ -35,6 +36,22 @@ export async function PATCH(
     const text = String(body.post_text).trim();
     if (!text) return NextResponse.json({ error: "Texto não pode ser vazio." }, { status: 400 });
     update.post_text = text;
+  }
+
+  if (body.scheduled_for !== undefined) {
+    if (body.scheduled_for === null || body.scheduled_for === "") {
+      update.scheduled_for = null;
+    } else {
+      const d = new Date(body.scheduled_for);
+      if (isNaN(d.getTime())) {
+        return NextResponse.json({ error: "Data inválida." }, { status: 400 });
+      }
+      if (d <= new Date()) {
+        return NextResponse.json({ error: "Data deve ser no futuro." }, { status: 400 });
+      }
+      update.scheduled_for = d.toISOString();
+      update.status = "scheduled";
+    }
   }
 
   if (body.hashtags !== undefined) {
