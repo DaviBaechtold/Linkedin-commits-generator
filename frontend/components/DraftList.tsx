@@ -1074,6 +1074,7 @@ async function compressImage(file: File): Promise<Blob> {
 
 function DraftImage({ url }: { url: string }) {
   const [errored, setErrored] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
 
   if (errored) {
     return (
@@ -1087,25 +1088,43 @@ function DraftImage({ url }: { url: string }) {
   }
 
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      title="Abrir imagem em tamanho real"
-      className="group relative block w-48 overflow-hidden rounded-lg sm:w-64"
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={url}
-        alt=""
-        loading="lazy"
-        onError={() => setErrored(true)}
-        className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-      />
-      <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-gradient-to-t from-black/70 to-transparent py-2 text-[11px] text-white/0 transition-colors group-hover:text-white/80">
-        <ExternalLink className="h-3 w-3" />
-        ver em tamanho real
-      </span>
-    </a>
+    <>
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+          onClick={() => setLightbox(false)}
+        >
+          <button
+            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20"
+            onClick={() => setLightbox(false)}
+          >
+            <X className="h-4 w-4" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={url}
+            alt=""
+            className="max-h-[90vh] max-w-[90vw] rounded-xl object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+      <button
+        onClick={() => setLightbox(true)}
+        className="group relative block w-48 overflow-hidden rounded-lg sm:w-64"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={url}
+          alt=""
+          loading="lazy"
+          onError={() => setErrored(true)}
+          className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+        />
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
+          <Eye className="h-6 w-6 text-white/0 drop-shadow transition-colors group-hover:text-white/90" />
+        </span>
+      </button>
+    </>
   );
 }
