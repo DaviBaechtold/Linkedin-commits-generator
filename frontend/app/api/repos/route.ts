@@ -55,6 +55,9 @@ export async function POST(request: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    console.error("Repo insert error:", error);
+    return NextResponse.json({ error: "Falha ao adicionar o repositório." }, { status: 500 });
+  }
   return NextResponse.json({ repo }, { status: 201 });
 }

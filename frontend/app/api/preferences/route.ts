@@ -97,6 +97,9 @@ export async function PUT(request: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    console.error("Preferences upsert error:", error);
+    return NextResponse.json({ error: "Falha ao salvar as preferências." }, { status: 500 });
+  }
   return NextResponse.json(data);
 }

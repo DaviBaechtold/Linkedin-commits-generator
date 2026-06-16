@@ -41,7 +41,10 @@ export async function PUT(request: NextRequest) {
     { onConflict: "user_id,provider" }
   );
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    console.error("Bluesky integration upsert error:", error);
+    return NextResponse.json({ error: "Falha ao salvar a integração Bluesky." }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }
 

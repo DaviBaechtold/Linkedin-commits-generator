@@ -73,7 +73,10 @@ export async function PATCH(
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    console.error("Draft update error:", error);
+    return NextResponse.json({ error: "Falha ao atualizar o rascunho." }, { status: 500 });
+  }
   return NextResponse.json(data);
 }
 
