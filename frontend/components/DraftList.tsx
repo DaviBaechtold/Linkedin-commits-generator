@@ -463,15 +463,18 @@ function DraftCard({
     }
   }
 
-  async function updateHashtags(tags: string[]) {
+  async function updateHashtags(tags: string[], newText?: string) {
+    const body: Record<string, unknown> = { hashtags: tags };
+    if (newText !== undefined) body.post_text = newText;
     const res = await fetch(`/api/drafts/${draft.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hashtags: tags }),
+      body: JSON.stringify(body),
     });
     if (res.ok) {
       const json = await res.json();
       setHashtags(json.hashtags ?? []);
+      setEditText(json.post_text);
       onUpdate(json);
     }
   }
@@ -479,7 +482,13 @@ function DraftCard({
   async function removeHashtag(tag: string) {
     const updated = hashtags.filter((t) => t !== tag);
     setHashtags(updated);
-    await updateHashtags(updated);
+    // Remove the hashtag from post_text (case-insensitive, strip surrounding whitespace)
+    const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const newText = draft.post_text
+      .replace(new RegExp(`\\s*${escaped}(?=\\s|$)`, "gi"), "")
+      .trimEnd();
+    onUpdate({ ...draft, post_text: newText, hashtags: updated });
+    await updateHashtags(updated, newText);
   }
 
   async function addHashtag() {
@@ -491,7 +500,10 @@ function DraftCard({
     setHashtags(updated);
     setNewTag("");
     setAddingTag(false);
-    await updateHashtags(updated);
+    // Append the new hashtag to post_text
+    const newText = draft.post_text.trimEnd() + " " + formatted;
+    onUpdate({ ...draft, post_text: newText, hashtags: updated });
+    await updateHashtags(updated, newText);
   }
 
   async function saveEdit() {
