@@ -85,42 +85,64 @@ function useReveal(threshold = 0.12) {
   return { ref, on };
 }
 
+function loadScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
 export default function LandingPage() {
   const { text, fading } = useCycler(CYCLE);
   const features = useReveal();
   const flow = useReveal();
   const [chipsIn, setChipsIn] = useState(false);
+  const vantaRef = useRef<HTMLDivElement>(null);
+  const vantaEffect = useRef<{ destroy: () => void } | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setChipsIn(true), 500);
     return () => clearTimeout(t);
   }, []);
 
+  useEffect(() => {
+    async function initVanta() {
+      await loadScript("https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js");
+      await loadScript("https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.net.min.js");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const w = window as any;
+      if (!vantaRef.current || !w.VANTA) return;
+      vantaEffect.current = w.VANTA.NET({
+        el: vantaRef.current,
+        mouseControls: true,
+        touchControls: true,
+        gyroControls: false,
+        minHeight: 200,
+        minWidth: 200,
+        scale: 1,
+        scaleMobile: 1,
+        color: 0x456ae1,
+        backgroundColor: 0x2b2631,
+        points: 20,
+        maxDistance: 21,
+        showDots: true,
+        spacing: 15,
+      });
+    }
+    initVanta().catch(() => {});
+    return () => {
+      vantaEffect.current?.destroy();
+      vantaEffect.current = null;
+    };
+  }, []);
+
   return (
     <>
       <style>{`
-        @keyframes glowPulse {
-          0%,100% { opacity:.55; }
-          50%      { opacity:1;   }
-        }
-        @keyframes orb1 {
-          0%,100% { transform:translate(0px,0px); }
-          33%      { transform:translate(90px,70px); }
-          66%      { transform:translate(-50px,110px); }
-        }
-        @keyframes orb2 {
-          0%,100% { transform:translate(0px,0px); }
-          40%      { transform:translate(-130px,-90px); }
-          80%      { transform:translate(70px,-30px); }
-        }
-        @keyframes orb3 {
-          0%,100% { transform:translate(0px,0px); }
-          50%      { transform:translate(-70px,90px); }
-        }
-        @keyframes gridDrift {
-          0%,100% { transform:translateY(0px); }
-          50%      { transform:translateY(-10px); }
-        }
         @keyframes fadeUp {
           from { opacity:0; transform:translateY(18px); }
           to   { opacity:1; transform:translateY(0);    }
@@ -149,45 +171,10 @@ export default function LandingPage() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-[rgb(10,10,12)] text-white overflow-x-hidden">
+      <div className="min-h-screen bg-[#2b2631] text-white overflow-x-hidden">
 
-        {/* Background system */}
-        <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-          {/* Dot grid */}
-          <div style={{
-            position:"absolute", inset:0,
-            backgroundImage:"radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)",
-            backgroundSize:"44px 44px",
-            animation:"gridDrift 20s ease-in-out infinite",
-          }} />
-          {/* Top glow */}
-          <div style={{
-            position:"absolute", inset:0,
-            background:"radial-gradient(ellipse 110% 55% at 50% -2%, rgba(10,102,194,.14) 0%, transparent 65%)",
-            animation:"glowPulse 9s ease-in-out infinite",
-          }} />
-          {/* Orb 1 — blue, top-left */}
-          <div style={{
-            position:"absolute", width:"650px", height:"650px", borderRadius:"50%",
-            background:"radial-gradient(circle, rgba(10,102,194,0.11) 0%, transparent 70%)",
-            top:"-180px", left:"-180px",
-            animation:"orb1 28s ease-in-out infinite",
-          }} />
-          {/* Orb 2 — light blue, bottom-right */}
-          <div style={{
-            position:"absolute", width:"520px", height:"520px", borderRadius:"50%",
-            background:"radial-gradient(circle, rgba(55,143,233,0.07) 0%, transparent 70%)",
-            bottom:"-120px", right:"-120px",
-            animation:"orb2 35s ease-in-out infinite",
-          }} />
-          {/* Orb 3 — purple accent, center-right */}
-          <div style={{
-            position:"absolute", width:"360px", height:"360px", borderRadius:"50%",
-            background:"radial-gradient(circle, rgba(139,92,246,0.07) 0%, transparent 70%)",
-            top:"55%", left:"68%",
-            animation:"orb3 22s ease-in-out infinite",
-          }} />
-        </div>
+        {/* Vanta NET background */}
+        <div ref={vantaRef} aria-hidden className="pointer-events-none fixed inset-0 z-0" />
 
         {/* Nav */}
         <nav className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-[rgb(10,10,12)]/80 backdrop-blur-md">
