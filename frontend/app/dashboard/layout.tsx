@@ -40,7 +40,7 @@ export default async function DashboardLayout({
     "Usuário";
 
   return (
-    <Sidebar user={{ avatarUrl, name }} setupComplete={setupComplete}>
+    <Sidebar user={{ avatarUrl, name }} setupComplete={setupComplete} userId={user.id}>
       {children}
     </Sidebar>
   );

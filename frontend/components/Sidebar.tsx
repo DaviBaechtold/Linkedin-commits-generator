@@ -17,10 +17,11 @@ import OnboardingTour from "./OnboardingTour";
 interface SidebarProps {
   user: { avatarUrl?: string; name: string };
   setupComplete: boolean;
+  userId: string;
   children: React.ReactNode;
 }
 
-export default function Sidebar({ user, setupComplete, children }: SidebarProps) {
+export default function Sidebar({ user, setupComplete, userId, children }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -51,7 +52,7 @@ export default function Sidebar({ user, setupComplete, children }: SidebarProps)
 
   return (
     <div className="flex min-h-screen">
-      <OnboardingTour setupComplete={setupComplete} />
+      <OnboardingTour setupComplete={setupComplete} userId={userId} />
 
       <aside
         className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-white/5 bg-[rgb(15,15,18)] transition-[width] duration-200 ${sidebarW}`}

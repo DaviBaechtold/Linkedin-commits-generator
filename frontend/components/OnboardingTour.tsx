@@ -4,8 +4,17 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { X, ArrowRight } from "lucide-react";
 
-const STORAGE_KEY = "commitpost_tour_v1";
 const GOLD = "#D4AF37";
+
+/**
+ * Chave de localStorage por-usuário. Sem o sufixo do userId, a flag vazava
+ * entre contas: ao excluir a conta e logar em outra no mesmo navegador, o tour
+ * não reaparecia. Atrelar ao userId garante que cada conta tem seu próprio
+ * estado de onboarding.
+ */
+function storageKey(userId: string) {
+  return `commitpost_tour_v1_${userId}`;
+}
 
 interface ModalStep {
   kind: "modal";
@@ -173,11 +182,14 @@ function findWithRetry(target: string, onFound: (el: Element) => void, max = 25)
 
 export default function OnboardingTour({
   setupComplete = false,
+  userId,
 }: {
   setupComplete?: boolean;
+  userId: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const STORAGE_KEY = storageKey(userId);
 
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
@@ -193,7 +205,7 @@ export default function OnboardingTour({
       return;
     }
     if (!localStorage.getItem(STORAGE_KEY)) setVisible(true);
-  }, [setupComplete]);
+  }, [setupComplete, STORAGE_KEY]);
 
   const current = STEPS[step];
 
