@@ -80,3 +80,32 @@ export function decryptToken(stored: string | null | undefined): string {
 export function isEncrypted(stored: string | null | undefined): boolean {
   return !!stored && stored.startsWith(`${PREFIX}:`);
 }
+
+/**
+ * Garante que um valor esteja cifrado. Se já tiver o prefixo `v1:`, devolve
+ * como está; se for legado (plaintext), cifra. Usado na migração one-shot de
+ * re-cifragem de tokens antigos.
+ */
+export function ensureEncrypted(stored: string | null | undefined): string | null {
+  if (!stored) return null;
+  return isEncrypted(stored) ? stored : encryptToken(stored);
+}
+
+/**
+ * Comparação de strings em tempo constante (resistente a timing attacks).
+ * Usada para validar segredos como o `CRON_SECRET`.
+ */
+export function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "utf8");
+  const bufB = Buffer.from(b, "utf8");
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+/** Valida o header `Authorization: Bearer <CRON_SECRET>` de forma timing-safe. */
+export function isValidCronAuth(authHeader: string | null): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) return false;
+  return safeEqual(authHeader.slice("Bearer ".length), secret);
+}

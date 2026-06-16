@@ -5,7 +5,7 @@ import { generateImage, type ImageConfig } from "@/lib/image";
 import { getDefaultModel, type AIProvider } from "@/lib/ai-providers";
 import type { ImageProvider } from "@/lib/image-providers";
 import { fetchCommits, formatCommitsForPrompt, type GitHubCommit } from "@/lib/github";
-import { decryptToken } from "@/lib/crypto";
+import { decryptToken, isValidCronAuth } from "@/lib/crypto";
 import { notify } from "@/lib/notifications";
 
 export const maxDuration = 60;
@@ -25,8 +25,7 @@ function isDue(lastGeneratedAt: string | null, frequency: string, autoHour: numb
 }
 
 export async function GET(request: NextRequest) {
-  const auth = request.headers.get("authorization");
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isValidCronAuth(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

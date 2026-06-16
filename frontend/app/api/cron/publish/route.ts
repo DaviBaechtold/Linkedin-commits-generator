@@ -1,14 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { publishPost } from "@/lib/linkedin";
-import { decryptToken } from "@/lib/crypto";
+import { decryptToken, isValidCronAuth } from "@/lib/crypto";
 import { notify } from "@/lib/notifications";
 
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
-  const auth = request.headers.get("authorization");
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isValidCronAuth(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

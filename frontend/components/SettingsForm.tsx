@@ -18,6 +18,7 @@ import {
   Zap,
   Image,
   Cloud,
+  Download,
 } from "lucide-react";
 
 interface Props {
@@ -1204,6 +1205,30 @@ export default function SettingsForm({
 
         </div>{/* end grid preferências */}
       </div>{/* end group preferências */}
+
+      {/* ── Seus dados (LGPD) ── */}
+      <div>
+        <SettingsGroupHeader title="Seus dados" />
+        <section className="card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="mb-1 text-sm font-semibold text-white/90">
+              Exportar meus dados
+            </h2>
+            <p className="text-xs text-white/40">
+              Baixe um arquivo JSON com todos os seus dados (rascunhos, repositórios,
+              preferências e histórico). Chaves de API e tokens não são incluídos.
+            </p>
+          </div>
+          <a
+            href="/api/account/export"
+            download
+            className="btn-secondary shrink-0 self-start"
+          >
+            <Download className="h-4 w-4" />
+            Exportar dados
+          </a>
+        </section>
+      </div>
 
       {/* ── Zona de Perigo ── */}
       <div>

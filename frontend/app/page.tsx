@@ -389,6 +389,14 @@ export default function LandingPage() {
 
           </div>
           <div className="border-t border-white/[0.05] py-5 text-center text-xs text-white/18">
+            <div className="mb-2 flex items-center justify-center gap-4">
+              <Link href="/privacidade" className="hover:text-white/40">
+                Política de Privacidade
+              </Link>
+              <Link href="/termos" className="hover:text-white/40">
+                Termos de Uso
+              </Link>
+            </div>
             CommitPost — geração responsável de conteúdo profissional
           </div>
         </footer>
