@@ -19,6 +19,7 @@ import {
   Image,
   Cloud,
   Download,
+  Clock,
 } from "lucide-react";
 
 interface Props {
@@ -371,7 +372,10 @@ export default function SettingsForm({
       const res = await fetch("/api/preferences", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(autoPost),
+        // Horário fixo em 9 (UTC): é o único momento em que o cron de geração
+        // roda. A UI não expõe escolha de horário para não prometer o que o
+        // agendador não cumpre.
+        body: JSON.stringify({ ...autoPost, auto_post_hour: 9 }),
       });
       if (res.ok) setAutoPostSaved(true);
     } finally {
@@ -810,22 +814,16 @@ export default function SettingsForm({
             </div>
 
             <div>
-              <label className="label">Horário preferido (UTC)</label>
-              <select
-                className="input"
-                value={autoPost.auto_post_hour}
-                onChange={(e) =>
-                  setAutoPost((a) => ({ ...a, auto_post_hour: parseInt(e.target.value) }))
-                }
-              >
-                {Array.from({ length: 24 }, (_, i) => (
-                  <option key={i} value={i}>
-                    {String(i).padStart(2, "0")}:00 UTC
-                  </option>
-                ))}
-              </select>
+              <label className="label">Horário de geração</label>
+              <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                <Clock className="h-4 w-4 shrink-0 text-white/30" />
+                <span className="text-sm text-white/70">
+                  Pela manhã, por volta das 06:00 (BRT)
+                </span>
+              </div>
               <p className="mt-1 text-xs text-white/25">
-                Horário em UTC. Para BRT (UTC-3) subtraia 3 horas.
+                Os posts são gerados automaticamente no início do dia, dentro da
+                frequência escolhida acima.
               </p>
             </div>
 

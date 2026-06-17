@@ -10,11 +10,10 @@ import { notify } from "@/lib/notifications";
 
 export const maxDuration = 60;
 
-function isDue(lastGeneratedAt: string | null, frequency: string, autoHour: number): boolean {
-  const nowUtcHour = new Date().getUTCHours();
-  // Only process during the configured UTC hour (±1h tolerance)
-  if (Math.abs(nowUtcHour - autoHour) > 1 && !(nowUtcHour === 23 && autoHour === 0)) return false;
-
+function isDue(lastGeneratedAt: string | null, frequency: string): boolean {
+  // O timing é controlado pelo próprio cron (roda 1×/dia, de manhã em UTC).
+  // Aqui só decidimos a cadência (diária/semanal) — sem filtro de hora, para
+  // não depender de valores antigos de auto_post_hour no banco.
   if (!lastGeneratedAt) return true;
 
   const hoursSinceLast = (Date.now() - new Date(lastGeneratedAt).getTime()) / 3_600_000;
@@ -47,10 +46,9 @@ export async function GET(request: NextRequest) {
 
     try {
       const frequency = (pref.auto_post_frequency as string) ?? "weekly";
-      const autoHour = (pref.auto_post_hour as number) ?? 9;
       const graceHours = (pref.auto_post_grace_hours as number) ?? 2;
 
-      if (!isDue(pref.auto_post_last_generated_at as string | null, frequency, autoHour)) continue;
+      if (!isDue(pref.auto_post_last_generated_at as string | null, frequency)) continue;
 
       const aiProvider = ((pref.ai_provider as AIProvider) ?? "gemini") as AIProvider;
       const aiModel = (pref.ai_model as string) ?? getDefaultModel(aiProvider);
