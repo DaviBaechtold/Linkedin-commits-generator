@@ -23,24 +23,28 @@ const PROVIDERS = [
 const FEATURES = [
   {
     Icon: Calendar,
+    anim: "ico-cal",
     color: "#0A66C2",
     title: "Auto-post agendado",
     desc: "Define o intervalo, a IA gera e publica sozinha — sem abrir o computador.",
   },
   {
     Icon: Eye,
+    anim: "ico-eye",
     color: "#10B981",
     title: "Revisão antes de publicar",
     desc: "Todo post passa pela sua aprovação. Regenere texto ou imagem com um clique.",
   },
   {
     Icon: ShieldCheck,
+    anim: "ico-shield",
     color: "#EF4444",
     title: "Filtro NDA embutido",
     desc: "Nomes de empresas, clientes e código nunca aparecem nos posts.",
   },
   {
     Icon: ImageIcon,
+    anim: "ico-img",
     color: "#F59E0B",
     title: "Geração de imagens",
     desc: "Pollinations.ai gratuito, DALL·E 3 ou Fal.ai FLUX — você escolhe.",
@@ -126,6 +130,41 @@ export default function LandingPage() {
           transform: translateY(-3px);
           border-color: rgba(255,255,255,.14) !important;
           box-shadow: 0 12px 40px rgba(0,0,0,.45);
+        }
+
+        /* ── Micro-animações dos ícones de features ── */
+        .ico-key,.ico-cal,.ico-eye,.ico-shield,.ico-img { transform-origin: center; }
+        @keyframes keyTurn {
+          0%{transform:rotate(0)} 25%{transform:rotate(-20deg)}
+          55%{transform:rotate(14deg)} 80%{transform:rotate(-6deg)} 100%{transform:rotate(0)}
+        }
+        @keyframes calFlip {
+          0%{transform:perspective(60px) rotateX(0)} 40%{transform:perspective(60px) rotateX(-38deg)}
+          70%{transform:perspective(60px) rotateX(8deg)} 100%{transform:perspective(60px) rotateX(0)}
+        }
+        @keyframes eyeBlink {
+          0%,68%,100%{transform:scaleY(1)} 80%{transform:scaleY(.12)} 90%{transform:scaleY(1)}
+        }
+        @keyframes shieldPop {
+          0%{transform:scale(1)} 30%{transform:scale(1.18)} 52%{transform:scale(.95)} 100%{transform:scale(1)}
+        }
+        @keyframes imgGen {
+          0%{transform:scale(1);filter:hue-rotate(0)} 50%{transform:scale(1.1);filter:hue-rotate(28deg)}
+          100%{transform:scale(1);filter:hue-rotate(0)}
+        }
+        @media (prefers-reduced-motion: no-preference) {
+          /* entrada ao revelar (escalonada) */
+          .feat-grid.revealed .ico-key    { animation: keyTurn  .7s .05s ease both; }
+          .feat-grid.revealed .ico-cal    { animation: calFlip  .7s .15s ease both; }
+          .feat-grid.revealed .ico-eye    { animation: eyeBlink .9s .25s ease both; }
+          .feat-grid.revealed .ico-shield { animation: shieldPop .7s .35s ease both; }
+          .feat-grid.revealed .ico-img    { animation: imgGen   .8s .45s ease both; }
+          /* replay no hover (vem depois → ganha na mesma especificidade) */
+          .fcard:hover .ico-key    { animation: keyTurn  .7s ease both; }
+          .fcard:hover .ico-cal    { animation: calFlip  .7s ease both; }
+          .fcard:hover .ico-eye    { animation: eyeBlink .9s ease both; }
+          .fcard:hover .ico-shield { animation: shieldPop .7s ease both; }
+          .fcard:hover .ico-img    { animation: imgGen   .8s ease both; }
         }
       `}</style>
 
@@ -216,7 +255,7 @@ export default function LandingPage() {
         <section className="relative z-10 mx-auto max-w-5xl px-4 pb-28">
           <div
             ref={features.ref}
-            className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+            className={`feat-grid grid grid-cols-1 gap-4 sm:grid-cols-3 ${features.on ? "revealed" : ""}`}
           >
             {/* BYOK — large card */}
             <div
@@ -231,7 +270,7 @@ export default function LandingPage() {
                 className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl"
                 style={{ background: "rgba(139,92,246,.15)", color: "#8B5CF6" }}
               >
-                <KeyRound className="h-5 w-5" />
+                <KeyRound className="ico-key h-5 w-5" />
               </div>
               <h3 className="mb-1.5 text-base font-semibold text-white">
                 Traga sua própria chave de IA
@@ -261,7 +300,7 @@ export default function LandingPage() {
             </div>
 
             {/* Small feature cards */}
-            {FEATURES.map(({ Icon, color, title, desc }, i) => (
+            {FEATURES.map(({ Icon, anim, color, title, desc }, i) => (
               <div
                 key={title}
                 className="fcard rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5"
@@ -275,7 +314,7 @@ export default function LandingPage() {
                   className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg"
                   style={{ background: `${color}18`, color }}
                 >
-                  <Icon className="h-4.5 w-4.5" />
+                  <Icon className={`${anim} h-4.5 w-4.5`} />
                 </div>
                 <p className="mb-1 text-sm font-semibold text-white/90">{title}</p>
                 <p className="text-xs leading-relaxed text-white/38">{desc}</p>
