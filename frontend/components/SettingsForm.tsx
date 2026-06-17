@@ -31,6 +31,49 @@ interface Props {
   usageStats: { today: number; week: number; month: number };
 }
 
+// ── Agendamento por dia da semana ──────────────────────────────────────────
+// O cron roda 1×/dia de manhã (UTC); a frequência define EM QUAIS dias gerar.
+// Presets viram strings simples; "Personalizado" vira "custom:1,3,5"
+// (0=domingo … 6=sábado). Sem mudança de schema — reusa auto_post_frequency.
+const FREQ_PRESETS: { value: string; label: string }[] = [
+  { value: "daily", label: "Todos os dias" },
+  { value: "weekdays", label: "Dias úteis (Seg–Sex)" },
+  { value: "weekends", label: "Fins de semana (Sáb, Dom)" },
+  { value: "mwf", label: "3× por semana (Seg, Qua, Sex)" },
+  { value: "weekly", label: "Semanal (Segunda)" },
+  { value: "custom", label: "Personalizado…" },
+];
+const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const PRESET_DAYS: Record<string, number[]> = {
+  daily: [0, 1, 2, 3, 4, 5, 6],
+  weekdays: [1, 2, 3, 4, 5],
+  weekends: [0, 6],
+  mwf: [1, 3, 5],
+  weekly: [1],
+};
+function isCustomFreq(f: string): boolean {
+  return f.startsWith("custom:");
+}
+function freqDays(f: string): number[] {
+  if (isCustomFreq(f)) {
+    return f.slice(7).split(",").filter(Boolean).map(Number).filter((d) => d >= 0 && d <= 6);
+  }
+  return PRESET_DAYS[f] ?? PRESET_DAYS.weekly;
+}
+function daysToCustomFreq(days: number[]): string {
+  const sorted = [...new Set(days)].sort((a, b) => a - b);
+  return `custom:${sorted.join(",")}`;
+}
+function describeDays(days: number[]): string {
+  if (days.length === 0) return "Nenhum dia selecionado";
+  if (days.length === 7) return "Todos os dias";
+  return days
+    .slice()
+    .sort((a, b) => a - b)
+    .map((d) => DAY_LABELS[d])
+    .join(", ");
+}
+
 export default function SettingsForm({
   preferences,
   linkedinConnected,
@@ -803,14 +846,62 @@ export default function SettingsForm({
               <label className="label">Frequência</label>
               <select
                 className="input"
-                value={autoPost.auto_post_frequency}
-                onChange={(e) =>
-                  setAutoPost((a) => ({ ...a, auto_post_frequency: e.target.value }))
+                value={
+                  isCustomFreq(autoPost.auto_post_frequency)
+                    ? "custom"
+                    : autoPost.auto_post_frequency
                 }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setAutoPost((a) => ({
+                    ...a,
+                    auto_post_frequency:
+                      v === "custom"
+                        ? daysToCustomFreq(freqDays(a.auto_post_frequency))
+                        : v,
+                  }));
+                }}
               >
-                <option value="daily">Diário</option>
-                <option value="weekly">Semanal</option>
+                {FREQ_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
               </select>
+
+              {isCustomFreq(autoPost.auto_post_frequency) && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {DAY_LABELS.map((lbl, idx) => {
+                    const selected = freqDays(autoPost.auto_post_frequency).includes(idx);
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          const cur = new Set(freqDays(autoPost.auto_post_frequency));
+                          if (cur.has(idx)) cur.delete(idx);
+                          else cur.add(idx);
+                          setAutoPost((a) => ({
+                            ...a,
+                            auto_post_frequency: daysToCustomFreq([...cur]),
+                          }));
+                        }}
+                        className={`h-9 w-11 rounded-lg border text-xs font-medium transition-colors ${
+                          selected
+                            ? "border-brand bg-brand/15 text-brand-light"
+                            : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70"
+                        }`}
+                      >
+                        {lbl}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <p className="mt-1 text-xs text-white/25">
+                Gera nos dias: {describeDays(freqDays(autoPost.auto_post_frequency))}
+              </p>
             </div>
 
             <div>

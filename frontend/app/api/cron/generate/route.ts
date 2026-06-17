@@ -10,17 +10,37 @@ import { notify } from "@/lib/notifications";
 
 export const maxDuration = 60;
 
+// Presets de dias da semana (0=domingo … 6=sábado). "Personalizado" chega como
+// "custom:1,3,5". O cron roda 1×/dia de manhã (UTC); aqui só checamos se HOJE é
+// um dos dias escolhidos e se já não geramos no mesmo dia.
+const PRESET_DAYS: Record<string, number[]> = {
+  daily: [0, 1, 2, 3, 4, 5, 6],
+  weekdays: [1, 2, 3, 4, 5],
+  weekends: [0, 6],
+  mwf: [1, 3, 5],
+  weekly: [1],
+};
+
+function allowedDays(frequency: string): number[] {
+  if (frequency?.startsWith("custom:")) {
+    return frequency
+      .slice(7)
+      .split(",")
+      .filter(Boolean)
+      .map(Number)
+      .filter((d) => d >= 0 && d <= 6);
+  }
+  return PRESET_DAYS[frequency] ?? PRESET_DAYS.weekly;
+}
+
 function isDue(lastGeneratedAt: string | null, frequency: string): boolean {
-  // O timing é controlado pelo próprio cron (roda 1×/dia, de manhã em UTC).
-  // Aqui só decidimos a cadência (diária/semanal) — sem filtro de hora, para
-  // não depender de valores antigos de auto_post_hour no banco.
+  const todayUtc = new Date().getUTCDay();
+  if (!allowedDays(frequency).includes(todayUtc)) return false;
+
   if (!lastGeneratedAt) return true;
-
+  // Evita gerar duas vezes no mesmo dia caso o cron seja reexecutado.
   const hoursSinceLast = (Date.now() - new Date(lastGeneratedAt).getTime()) / 3_600_000;
-  if (frequency === "daily") return hoursSinceLast >= 20;
-  if (frequency === "weekly") return hoursSinceLast >= 7 * 24 - 4;
-
-  return false;
+  return hoursSinceLast >= 20;
 }
 
 export async function GET(request: NextRequest) {

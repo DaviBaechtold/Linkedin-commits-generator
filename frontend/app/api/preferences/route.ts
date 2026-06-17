@@ -64,6 +64,15 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Tom inválido." }, { status: 400 });
   }
 
+  if (update.auto_post_frequency !== undefined) {
+    const f = String(update.auto_post_frequency);
+    const presets = ["daily", "weekdays", "weekends", "mwf", "weekly"];
+    const ok = presets.includes(f) || /^custom:([0-6](,[0-6])*)?$/.test(f);
+    if (!ok) {
+      return NextResponse.json({ error: "Frequência inválida." }, { status: 400 });
+    }
+  }
+
   if (update.nda_custom_rules !== undefined) {
     if (typeof update.nda_custom_rules !== "string") {
       return NextResponse.json({ error: "nda_custom_rules inválido." }, { status: 400 });
