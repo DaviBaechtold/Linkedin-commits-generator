@@ -7,6 +7,7 @@ import {
   GitBranch, Eye, ShieldCheck, Calendar, ImageIcon,
   ArrowRight, Sparkles, KeyRound,
 } from "lucide-react";
+import HowItWorksDemo from "@/components/HowItWorksDemo";
 
 const syne = Syne({ subsets: ["latin"], weight: ["700", "800"], display: "swap" });
 
@@ -45,8 +46,6 @@ const FEATURES = [
     desc: "Pollinations.ai gratuito, DALL·E 3 ou Fal.ai FLUX — você escolhe.",
   },
 ];
-
-const STEPS = ["GitHub", "Sua IA", "Você revisa", "LinkedIn"];
 
 function useCycler(items: string[]) {
   const [idx, setIdx] = useState(0);
@@ -88,7 +87,6 @@ function useReveal(threshold = 0.12) {
 export default function LandingPage() {
   const { text, fading } = useCycler(CYCLE);
   const features = useReveal();
-  const flow = useReveal();
   const [chipsIn, setChipsIn] = useState(false);
 
   useEffect(() => {
@@ -286,60 +284,8 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ── How it works ── */}
-        <section className="relative z-10 mx-auto max-w-2xl px-4 pb-32 text-center">
-          <p className="mb-10 text-[11px] font-semibold uppercase tracking-[.18em] text-white/22">
-            Como funciona
-          </p>
-
-          <div ref={flow.ref} className="relative flex items-start justify-center">
-            {/* Animated connector line */}
-            {flow.on && (
-              <div
-                className="absolute left-[12%] right-[12%] top-5 h-px"
-                style={{
-                  background:
-                    "linear-gradient(90deg, rgba(10,102,194,.3) 0%, rgba(55,143,233,.6) 50%, rgba(10,102,194,.3) 100%)",
-                  transformOrigin: "left",
-                  animation: "connectorGrow .9s .1s ease forwards",
-                  opacity: 0,
-                  animationFillMode: "forwards",
-                  animationDelay: ".1s",
-                }}
-              />
-            )}
-
-            {STEPS.map((step, i) => {
-              const isLast = i === STEPS.length - 1;
-              return (
-                <div
-                  key={step}
-                  className="relative z-10 flex flex-1 flex-col items-center gap-2.5"
-                  style={{
-                    opacity: flow.on ? 1 : 0,
-                    transition: `opacity .4s ${i * 110}ms ease`,
-                  }}
-                >
-                  <div
-                    className="flex h-10 w-10 items-center justify-center rounded-full border bg-[rgb(10,10,12)] text-xs font-bold"
-                    style={{
-                      borderColor: isLast ? "rgba(10,102,194,.5)" : "rgba(255,255,255,.1)",
-                      color: isLast ? "#378FE9" : "rgba(255,255,255,.55)",
-                    }}
-                  >
-                    {i + 1}
-                  </div>
-                  <span
-                    className="text-xs font-medium"
-                    style={{ color: isLast ? "#378FE9" : "rgba(255,255,255,.45)" }}
-                  >
-                    {step}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+        {/* ── How it works (demo animado em loop) ── */}
+        <HowItWorksDemo />
 
         {/* Footer */}
         <footer className="relative z-10 border-t border-white/[0.06] bg-white/[0.01]">
